@@ -4,8 +4,10 @@ import argparse
 
 import matplotlib.pyplot as plt
 
-from PIL import Image
 from datetime import datetime
+from datetime import date
+from pathlib import Path
+from PIL import Image
 
 def _find_color(c_val, sdc, len):
     """Given a color map _segmentdata structure, find & calculate current value."""
@@ -171,6 +173,9 @@ parser.add_argument('--dv', action='store_true', help="display vertical differen
 # Optional argument to display horizontal differences image
 parser.add_argument('--dh', action='store_true', help="display horizontal differences")
 
+# Optional argument to autosave the generated files
+parser.add_argument('--sv', action='store_true', help="autosave displayed intermediate images")
+
 args = parser.parse_args()
 print(args.fn)
 print(args.th)
@@ -182,6 +187,7 @@ print(args.da)
 print(args.dags)
 print(args.dv)
 print(args.dh)
+print(args.sv)
 
 # open the file into an image object.
 im = Image.open(args.fn)
@@ -190,6 +196,21 @@ pixels = im.load()
 if args.do:
     im.show()
 print("Original version, for comparisons.",  str(datetime.now()))
+
+# Set up for image file saves.
+today = date.today()
+saveDirStr = "./" + today.__format__("%Y%m%d")
+saveDir = Path(saveDirStr)
+
+if not saveDir.exists():
+    print("The save directory:", saveDirStr, "does not exist.")
+    print("Creating save directory.")
+    # NOTE: not doing this in a try/except block, because w/o save directory,
+    #       it's not worth doing all the calculations for the images
+    saveDir.mkdir()
+
+fn = im.filename.split(".")
+saveBase = saveDirStr + "/" + today.__format__("%Y%m%d") + "_" + fn[0] + "_"
 
 # create a canvas to posterize into
 pIm = Image.new('RGB', im.size, background)
@@ -213,11 +234,17 @@ for x in range(0, im.size[0]):
 if args.dp:
     pIm.show()
     iIm.show()
+    if args.sv:
+        pIm.save(saveBase + "p.jpg", format="JPEG", quality=95)
+        iIm.save(saveBase + "pi.jpg", format="JPEG", quality=95)
+
 print("Posterized version done.",  str(datetime.now()))
 print("Anti-posterized version done.")
 
 if args.dgs:
     gIm.show()
+    if args.sv:
+        gIm.save(saveBase + "gs.jpg", format="JPEG", quality=95)
 print("Grayscale version done.")
 
 # get averaged values
@@ -242,10 +269,14 @@ for x in range(margin, im.size[0] - other_margin):
         
 if args.da:
     avgIm.show()
+    if args.sv:
+        avgIm.save(saveBase + "a.jpg", format="JPEG", quality=95)
 print("Averaged version done.",  str(datetime.now()))
 
 if args.dags:
     gAvgIm.show()
+    if args.sv:
+        gAvgIm.save(saveBase + "ags.jpg", format="JPEG", quality=95)
 print("Grayscale averaged version done.")
 
 vDiffIm = Image.new('RGB', im.size, background)
@@ -261,6 +292,8 @@ for x in range(1, im.size[0] - 1):
 
 if args.dv:
     vDiffIm.show()
+    if args.sv:
+        vDiffIm.save(saveBase + "av.jpg", format="JPEG", quality=95)
 print("Vertical edges version done.", max_vDiff,  str(datetime.now()))
 
 hDiffIm = Image.new('RGB', im.size, background)
@@ -276,6 +309,8 @@ for x in range(1, im.size[0] - 1):
 
 if args.dh:
     hDiffIm.show()
+    if args.sv:
+        hDiffIm.save(saveBase + "ah.jpg", format="JPEG", quality=95)
 print("Horizontal edges version done.", max_hDiff,  str(datetime.now()))
 
 # Now get funky -- overlay edges on posterized version
@@ -300,7 +335,9 @@ for x in range(0, im.size[0]):
         afPixels[x, y] = apixel
 
 funkyIm.show()
+funkyIm.save(saveBase + "ap.jpg", format="JPEG", quality=95)
 print("Posterized and edged version done.",  str(datetime.now()))
 
 afunkyIm.show()
+afunkyIm.save(saveBase + "api.jpg", format="JPEG", quality=95)
 print("Anti-posterized and edged version done.")
