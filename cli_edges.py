@@ -3,8 +3,9 @@
 import argparse
 
 import matplotlib.pyplot as plt
-from PIL import Image
 
+from PIL import Image
+from datetime import datetime
 
 def _find_color(c_val, sdc, len):
     """Given a color map _segmentdata structure, find & calculate current value."""
@@ -61,6 +62,42 @@ def getAverage(im, x, y, size):
     return((int(r / pix_count), int(g / pix_count), int(b / pix_count)))
 
 
+def getVDiff(im, x, y):
+    # Get average intensity difference between pixel at (x,y)
+    #     and the three pixels centered on its x in the row below
+    # NOTE: making use of the fact that the pixels are all grayscale
+    #     which means r and g and b values are all equal, only use r
+
+    diff = 0
+    anchor = im.getpixel((x, y))
+    for newX in range(x - 1, x + 2):
+        diffPix = im.getpixel((newX, y + 1))
+        diff += abs(anchor[0] - diffPix[0])
+
+    gs = int(diff / 3)
+
+    return((gs, gs, gs))
+
+
+def getHDiff(im, x, y):
+    # Get average intensity difference between pixel at (x,y)
+    #     and the three pixels centered on its y in the column to the right
+    # NOTE: making use of the fact that the pixels are all grayscale
+    #     which means r and g and b values are all equal, only use r
+
+    diff = 0
+    anchor = im.getpixel((x, y))
+    for newY in range(y - 1, y + 2):
+        diffPix = im.getpixel((x + 1, newY))
+        diff += abs(anchor[0] - diffPix[0])
+
+    gs = int(diff / 3)
+
+    return((gs, gs, gs))
+
+
+print("Starting processing now:",  str(datetime.now()))
+
 # background default
 background = (0, 0, 0, 255)
 
@@ -103,32 +140,56 @@ parser.add_argument('--fn',
 parser.add_argument('--th',
                     type=int,
                     help="override default edge threshhold",
-                    default = 16
+                    default = 8
                     )
 
 # Optional argument for edge threshhold (defaults to 16)
 parser.add_argument('--bs',
                     type=int,
                     help="override default averaging box edge size",
-                    default = 5
+                    default = 3
                     )
 
-# Optional argument to display compute and display grayscale image
-parser.add_argument('--dgs', action='store_true', help="compute and dispaly grayscale")
+# Optional argument to display original image
+parser.add_argument('--do', action='store_true', help="display original")
 
-# Optional argument to display unedged posterized image
-parser.add_argument('--dp', action='store_true', help="display plain poster")
+# Optional argument to compute and display grayscale image
+parser.add_argument('--dgs', action='store_true', help="compute and display grayscale")
+
+# Optional argument to display unedged posterized images
+parser.add_argument('--dp', action='store_true', help="compute and display plain posters")
+
+# Optional argument to display averaged image
+parser.add_argument('--da', action='store_true', help="display averaged")
+
+# Optional argument to display grayscale averaged image
+parser.add_argument('--dags', action='store_true', help="display averaged grayscale")
+
+# Optional argument to display vertical differences image
+parser.add_argument('--dv', action='store_true', help="display vertical differences")
+
+# Optional argument to display horizontal differences image
+parser.add_argument('--dh', action='store_true', help="display horizontal differences")
 
 args = parser.parse_args()
 print(args.fn)
 print(args.th)
+print(args.bs)
+print(args.do)
 print(args.dgs)
 print(args.dp)
-print(args.bs)
+print(args.da)
+print(args.dags)
+print(args.dv)
+print(args.dh)
 
 # open the file into an image object.
 im = Image.open(args.fn)
 pixels = im.load()
+
+if args.do:
+    im.show()
+print("Original version, for comparisons.",  str(datetime.now()))
 
 # create a canvas to posterize into
 pIm = Image.new('RGB', im.size, background)
@@ -149,9 +210,15 @@ for x in range(0, im.size[0]):
         iPixels[x, y] = anticolors[bright]
         gPixels[x, y] = grays[bright]
 
-pIm.show()
-iIm.show()
-gIm.show()
+if args.dp:
+    pIm.show()
+    iIm.show()
+print("Posterized version done.",  str(datetime.now()))
+print("Anti-posterized version done.")
+
+if args.dgs:
+    gIm.show()
+print("Grayscale version done.")
 
 # get averaged values
 # NOTE: margin/other_margin are used to allow average generation w/o bounds checking
@@ -173,5 +240,67 @@ for x in range(margin, im.size[0] - other_margin):
         aPixels[x, y] = pixel
         gaPixels[x, y] = grays[get_brightness(pixel)]
         
-avgIm.show()
-gAvgIm.show()
+if args.da:
+    avgIm.show()
+print("Averaged version done.",  str(datetime.now()))
+
+if args.dags:
+    gAvgIm.show()
+print("Grayscale averaged version done.")
+
+vDiffIm = Image.new('RGB', im.size, background)
+vPixels = vDiffIm.load()
+
+# Get vertical intensity differences
+max_vDiff = 0
+for x in range(1, im.size[0] - 1):
+    for y in range(1, im.size[1] - 1):
+        vPixels[x, y] = getVDiff(gAvgIm, x, y)
+        if vPixels[x, y][0] > max_vDiff:
+            max_vDiff = vPixels[x, y][0]
+
+if args.dv:
+    vDiffIm.show()
+print("Vertical edges version done.", max_vDiff,  str(datetime.now()))
+
+hDiffIm = Image.new('RGB', im.size, background)
+hPixels = hDiffIm.load()
+
+# Get horizontal intensity differences
+max_hDiff = 0
+for x in range(1, im.size[0] - 1):
+    for y in range(1, im.size[1] - 1):
+        hPixels[x, y] = getHDiff(gAvgIm, x, y)
+        if hPixels[x, y][0] > max_hDiff:
+            max_hDiff = hPixels[x, y][0]
+
+if args.dh:
+    hDiffIm.show()
+print("Horizontal edges version done.", max_hDiff,  str(datetime.now()))
+
+# Now get funky -- overlay edges on posterized version
+funkyIm = Image.new('RGB', im.size, background)
+fPixels = funkyIm.load()
+
+afunkyIm = Image.new('RGB', im.size, background)
+afPixels = afunkyIm.load()
+
+threshhold = args.th
+for x in range(0, im.size[0]):
+    for y in range(0, im.size[1]):
+        if (vPixels[x, y][0] > threshhold) or (hPixels[x, y][0] > threshhold):
+            pixel = (0, 0, 0)
+            apixel = pixel
+        else:
+            bright = gaPixels[x, y][0]
+            pixel = colors[bright]
+            apixel = anticolors[bright]
+
+        fPixels[x, y] = pixel
+        afPixels[x, y] = apixel
+
+funkyIm.show()
+print("Posterized and edged version done.",  str(datetime.now()))
+
+afunkyIm.show()
+print("Anti-posterized and edged version done.")
