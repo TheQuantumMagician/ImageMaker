@@ -173,22 +173,25 @@ parser.add_argument('--dv', action='store_true', help="display vertical differen
 # Optional argument to display horizontal differences image
 parser.add_argument('--dh', action='store_true', help="display horizontal differences")
 
-# Optional argument to autosave the generated files
+# Optional argument to autosave the intermediate files
 parser.add_argument('--sv', action='store_true', help="autosave displayed intermediate images")
 
-args = parser.parse_args()
-print(args.fn)
-print(args.th)
-print(args.bs)
-print(args.do)
-print(args.dgs)
-print(args.dp)
-print(args.da)
-print(args.dags)
-print(args.dv)
-print(args.dh)
-print(args.sv)
+# Optional argument to autosave the edges file
+parser.add_argument('--se', action='store_true', help="autosave edges image")
 
+args = parser.parse_args()
+print("fn", args.fn)
+print("th", args.th)
+print("bs", args.bs)
+print("do", args.do)
+print("dgs", args.dgs)
+print("dp", args.dp)
+print("da", args.da)
+print("dags", args.dags)
+print("dv", args.dv)
+print("dh", args.dh)
+print("sv", args.sv)
+print("se", args.se)
 # open the file into an image object.
 im = Image.open(args.fn)
 pixels = im.load()
@@ -322,17 +325,29 @@ afPixels = afunkyIm.load()
 
 threshhold = args.th
 for x in range(0, im.size[0]):
+    # NOTE: Use the vertical differences image to keep track of edge pixels used
     for y in range(0, im.size[1]):
         if (vPixels[x, y][0] > threshhold) or (hPixels[x, y][0] > threshhold):
             pixel = (0, 0, 0)
             apixel = pixel
+            # Mark the edge pixels in the smoothed image, too
+            aPixels[x, y] = pixel
+            # Edge pixel, make white
+            vPixels[x, y] = (255, 255, 255)
         else:
             bright = gaPixels[x, y][0]
             pixel = colors[bright]
             apixel = anticolors[bright]
+            # Non-edge pixel, make black
+            vPixels[x, y] = (0, 0, 0)
 
         fPixels[x, y] = pixel
         afPixels[x, y] = apixel
+
+# Display and save the representation of the edges.
+if args.se:
+    vDiffIm.show()
+    vDiffIm.save(saveBase + "ae.jpg", format="JPEG", quality=95)
 
 funkyIm.show()
 funkyIm.save(saveBase + "ap.jpg", format="JPEG", quality=95)
@@ -341,3 +356,7 @@ print("Posterized and edged version done.",  str(datetime.now()))
 afunkyIm.show()
 afunkyIm.save(saveBase + "api.jpg", format="JPEG", quality=95)
 print("Anti-posterized and edged version done.")
+
+# Display and save the smoothed and edged version of the original image
+avgIm.show()
+avgIm.save(saveBase + "se.jpg", format="JPEG", quality=95)
