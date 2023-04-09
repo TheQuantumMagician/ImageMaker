@@ -103,30 +103,6 @@ print("Starting processing now:",  str(datetime.now()))
 # background default
 background = (0, 0, 0, 255)
 
-# walk_length = 100_000
-palette_length = 256
-
-# Build a color lookup table once, based on desired palette length
-sd = plt.cm.gist_rainbow._segmentdata
-r_len = len(sd['red'])
-g_len = len(sd['green'])
-b_len = len(sd['blue'])
-
-colors = []
-anticolors = []
-# Create a separate color for each palette entry from color map calculations.
-for col in range(0, palette_length):
-    c_val = col / palette_length
-    r = int(_find_color(c_val, sd['red'], r_len) * 255)
-    g = int(_find_color(c_val, sd['green'], g_len) * 255)
-    b = int(_find_color(c_val, sd['blue'], b_len) * 255)
-    color = (r, g, b)
-    colors.append(color)
-    anticolors.append(invert(color))
-
-# Create a grayscale lookup table
-grays = [(x, x, x) for x in range(palette_length)]
-
 # Instantiate the command line parser
 parser = argparse.ArgumentParser(description="edges: edge-enhancement and posterization application")
 
@@ -136,6 +112,14 @@ parser.add_argument('--fn',
                     dest="fn",
                     help="override default filename",
                     default="test.jpg"
+                    )
+
+# Optional argument for posterization palette (defaults to gist_rainbow)
+parser.add_argument('--pn',
+                    action="store",
+                    dest="pn",
+                    help="override default posterization palette",
+                    default="gist_rainbow"
                     )
 
 # Optional argument for edge threshhold (defaults to 16)
@@ -180,21 +164,42 @@ parser.add_argument('--sv', action='store_true', help="autosave displayed interm
 parser.add_argument('--se', action='store_true', help="autosave edges image")
 
 args = parser.parse_args()
-print("fn", args.fn)
-print("th", args.th)
-print("bs", args.bs)
-print("do", args.do)
-print("dgs", args.dgs)
-print("dp", args.dp)
-print("da", args.da)
-print("dags", args.dags)
-print("dv", args.dv)
-print("dh", args.dh)
-print("sv", args.sv)
-print("se", args.se)
+print("fn\t", args.fn)
+print("pn\t", args.pn)
+print("th\t", args.th)
+print("bs\t", args.bs)
+print("do\t", args.do)
+print("dgs\t", args.dgs)
+print("dp\t", args.dp)
+print("da\t", args.da)
+print("dags\t", args.dags)
+print("dv\t", args.dv)
+print("dh\t", args.dh)
+print("sv\t", args.sv)
+print("se\t", args.se)
 # open the file into an image object.
 im = Image.open(args.fn)
 pixels = im.load()
+
+# palettes
+palette_length = 256
+colors = []
+anticolors = []
+
+cm = plt.cm.get_cmap(args.pn)
+pl_max = palette_length - 1
+for c in range(palette_length):
+    color = cm(c / pl_max)
+    r = int(color[0] * 255)
+    g = int(color[1] * 255)
+    b = int(color[2] * 255)
+    colors.append((r, g, b))
+
+for color in colors:
+    anticolors.append(invert(color))
+
+# Create a grayscale lookup table
+grays = [(x, x, x) for x in range(palette_length)]
 
 if args.do:
     im.show()
@@ -316,6 +321,20 @@ if args.dh:
         hDiffIm.save(saveBase + "ah.jpg", format="JPEG", quality=95)
 print("Horizontal edges version done.", max_hDiff,  str(datetime.now()))
 
+# match a palette to the maximum edge differences
+pal_len = max(max_vDiff, max_hDiff) + 1
+cmax = pal_len - 1
+print("pal_len, cmax:", pal_len, cmax)
+
+diffColors = []
+# Create a separate color for each palette entry from color map calculations.
+for c in range(pal_len):
+    color = cm(c / cmax)
+    r = int(color[0] * 255)
+    g = int(color[1] * 255)
+    b = int(color[2] * 255)
+    diffColors.append((r, g, b))
+
 # Now get funky -- overlay edges on posterized version
 funkyIm = Image.new('RGB', im.size, background)
 fPixels = funkyIm.load()
@@ -332,6 +351,9 @@ for x in range(0, im.size[0]):
             apixel = pixel
             # Mark the edge pixels in the smoothed image, too
             aPixels[x, y] = pixel
+            # Edge pixel, colorize based on brightness
+            diffColor = max(vPixels[x, y][0], hPixels[x, y][0])
+            hPixels[x, y] = diffColors[diffColor]
             # Edge pixel, make white
             vPixels[x, y] = (255, 255, 255)
         else:
@@ -340,6 +362,7 @@ for x in range(0, im.size[0]):
             apixel = anticolors[bright]
             # Non-edge pixel, make black
             vPixels[x, y] = (0, 0, 0)
+            hPixels[x, y] = (0, 0, 0)
 
         fPixels[x, y] = pixel
         afPixels[x, y] = apixel
@@ -348,6 +371,8 @@ for x in range(0, im.size[0]):
 if args.se:
     vDiffIm.show()
     vDiffIm.save(saveBase + "ae.jpg", format="JPEG", quality=95)
+    hDiffIm.show()
+    hDiffIm.save(saveBase + "aec.jpg", format="JPEG", quality=95)
 
 funkyIm.show()
 funkyIm.save(saveBase + "ap.jpg", format="JPEG", quality=95)
