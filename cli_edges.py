@@ -9,27 +9,9 @@ from datetime import date
 from pathlib import Path
 from PIL import Image
 
-def _find_color(c_val, sdc, len):
-    """Given a color map _segmentdata structure, find & calculate current value."""
-
-    color = 0.0
-    for index in range(1, len):
-        cm_r = sdc[index]
-        cm_p = sdc[index - 1]
-        i_base = cm_p[0]
-        i_next = cm_r[0]
-        if c_val >= i_base and c_val < i_next:
-            # Found interval. Color ='s previous value plus prorated difference
-            #     between start of interval value and end of interval value.
-            c_base = cm_p[1]
-            c_next = cm_r[1]
-            color = c_base + (((c_val - i_base) / (i_next - i_base)) * (c_next - c_base))
-
-    return(color)
-
-
 def get_brightness(pixel):
     # Calculate luminosity of an (r, g, b) pixel
+
     gs = int((0.3 * pixel[0]) + (0.59 * pixel[1]) + (0.11 * pixel[2]))
 
     return(gs)
@@ -37,6 +19,7 @@ def get_brightness(pixel):
 
 def invert(pixel):
     # invert (compliment) the provided pixel
+
     r = 255 - pixel[0]
     g = 255 - pixel[1]
     b = 255 - pixel[2]
@@ -48,6 +31,7 @@ def getAverage(im, x, y, size):
     # calculate the average pixel value of a sizexsize square of pixels
     # centered on x, y (or slightly off-centered if size is even)
     # NOTE: Does no bounds checkig -- that's handld at the calling level
+
     r, g, b = 0, 0, 0
     margin = int(size / 2)
     other_margin = (size - margin)
@@ -98,6 +82,42 @@ def getHDiff(im, x, y):
     return((gs, gs, gs))
 
 
+def getMaxDiff(im, x, y):
+    # Get the maximum intensity difference between pixel at (x,y)
+    #     and the eight pixels centered on it
+    # NOTE: making use of the fact that the pixels are all grayscale
+    #     which means r and g and b values are all equal, only use r
+
+    diff = 0
+    anchor = im.getpixel((x, y))
+    for newX in range(x - 1, x + 2):
+        for newY in range(y - 1, y + 2):
+            diffPix = im.getpixel((x + 1, newY))
+            tempDiff = abs(anchor[0] - diffPix[0])
+            if tempDiff > diff:
+                diff = tempDiff
+
+    return((diff, diff, diff))
+
+
+heatmap = [(0, 0, 0),
+           (255, 0, 0),
+           (255, 0, 0),
+           (255, 255, 0),
+           (255, 255, 0),
+           (0, 255, 0),
+           (0, 255, 0),
+           (0, 255, 255),
+           (0, 255, 255),
+           (0, 0, 255),
+           (0, 0, 255),
+           (255, 0, 255),
+           (255, 0, 255),
+           (255, 255, 255),
+           ]
+hm_len = len(heatmap)
+
+
 print("Starting processing now:",  str(datetime.now()))
 
 # background default
@@ -137,6 +157,9 @@ parser.add_argument('--bs',
                     )
 
 # Optional argument to display original image
+parser.add_argument('--da', action='store_true', help="display all images")
+
+# Optional argument to display original image
 parser.add_argument('--do', action='store_true', help="display original")
 
 # Optional argument to compute and display grayscale image
@@ -146,10 +169,10 @@ parser.add_argument('--dgs', action='store_true', help="compute and display gray
 parser.add_argument('--dp', action='store_true', help="compute and display plain posters")
 
 # Optional argument to display averaged image
-parser.add_argument('--da', action='store_true', help="display averaged")
+parser.add_argument('--ds', action='store_true', help="display smoothed")
 
 # Optional argument to display grayscale averaged image
-parser.add_argument('--dags', action='store_true', help="display averaged grayscale")
+parser.add_argument('--dsgs', action='store_true', help="display smoothed grayscale")
 
 # Optional argument to display vertical differences image
 parser.add_argument('--dv', action='store_true', help="display vertical differences")
@@ -157,26 +180,33 @@ parser.add_argument('--dv', action='store_true', help="display vertical differen
 # Optional argument to display horizontal differences image
 parser.add_argument('--dh', action='store_true', help="display horizontal differences")
 
-# Optional argument to autosave the intermediate files
+# Optional argument to autosave all generated files
 parser.add_argument('--sv', action='store_true', help="autosave displayed intermediate images")
 
-# Optional argument to autosave the edges file
+# Optional argument to autosave the edges image
 parser.add_argument('--se', action='store_true', help="autosave edges image")
+
+# Optional argument to display the maxDiffs histogram
+parser.add_argument('--hi', action='store_true', help="display histogram")
 
 args = parser.parse_args()
 print("fn\t", args.fn)
 print("pn\t", args.pn)
 print("th\t", args.th)
 print("bs\t", args.bs)
+print("da\t", args.da)
 print("do\t", args.do)
 print("dgs\t", args.dgs)
 print("dp\t", args.dp)
-print("da\t", args.da)
-print("dags\t", args.dags)
+print("ds\t", args.da)
+print("dsgs\t", args.dsgs)
 print("dv\t", args.dv)
 print("dh\t", args.dh)
 print("sv\t", args.sv)
 print("se\t", args.se)
+print("hi\t", args.hi)
+threshhold = args.th
+
 # open the file into an image object.
 im = Image.open(args.fn)
 pixels = im.load()
@@ -201,9 +231,9 @@ for color in colors:
 # Create a grayscale lookup table
 grays = [(x, x, x) for x in range(palette_length)]
 
-if args.do:
+if args.do or args.da:
     im.show()
-print("Original version, for comparisons.",  str(datetime.now()))
+    print("Original version, for comparisons.",  str(datetime.now()))
 
 # Set up for image file saves.
 today = date.today()
@@ -217,8 +247,12 @@ if not saveDir.exists():
     #       it's not worth doing all the calculations for the images
     saveDir.mkdir()
 
+# Build the base file name string
 fn = im.filename.split(".")
-saveBase = saveDirStr + "/" + today.__format__("%Y%m%d") + "_" + fn[0] + "_"
+saveBase = saveDirStr + "/"
+saveBase += today.__format__("%Y%m%d") + "_"
+saveBase += fn[0] + "_"
+saveBase += args.pn + "_"
 
 # create a canvas to posterize into
 pIm = Image.new('RGB', im.size, background)
@@ -239,20 +273,23 @@ for x in range(0, im.size[0]):
         iPixels[x, y] = anticolors[bright]
         gPixels[x, y] = grays[bright]
 
-if args.dp:
+if args.dp or args.da:
     pIm.show()
     iIm.show()
-    if args.sv:
-        pIm.save(saveBase + "p.jpg", format="JPEG", quality=95)
-        iIm.save(saveBase + "pi.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    pIm.save(saveBase + "p.jpg", format="JPEG", quality=95)
+    iIm.save(saveBase + "pi.jpg", format="JPEG", quality=95)
 
 print("Posterized version done.",  str(datetime.now()))
 print("Anti-posterized version done.")
 
-if args.dgs:
+if args.dgs or args.da:
     gIm.show()
-    if args.sv:
-        gIm.save(saveBase + "gs.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    gIm.save(saveBase + "gs.jpg", format="JPEG", quality=95)
+
 print("Grayscale version done.")
 
 # get averaged values
@@ -275,16 +312,20 @@ for x in range(margin, im.size[0] - other_margin):
         aPixels[x, y] = pixel
         gaPixels[x, y] = grays[get_brightness(pixel)]
         
-if args.da:
+if args.ds or args.da:
     avgIm.show()
-    if args.sv:
-        avgIm.save(saveBase + "a.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    avgIm.save(saveBase + "a.jpg", format="JPEG", quality=95)
+
 print("Averaged version done.",  str(datetime.now()))
 
-if args.dags:
+if args.dsgs or args.da:
     gAvgIm.show()
-    if args.sv:
-        gAvgIm.save(saveBase + "ags.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    gAvgIm.save(saveBase + "ags.jpg", format="JPEG", quality=95)
+
 print("Grayscale averaged version done.")
 
 vDiffIm = Image.new('RGB', im.size, background)
@@ -298,10 +339,12 @@ for x in range(1, im.size[0] - 1):
         if vPixels[x, y][0] > max_vDiff:
             max_vDiff = vPixels[x, y][0]
 
-if args.dv:
+if args.dv or args.da:
     vDiffIm.show()
-    if args.sv:
-        vDiffIm.save(saveBase + "av.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    vDiffIm.save(saveBase + "av.jpg", format="JPEG", quality=95)
+
 print("Vertical edges version done.", max_vDiff,  str(datetime.now()))
 
 hDiffIm = Image.new('RGB', im.size, background)
@@ -315,11 +358,65 @@ for x in range(1, im.size[0] - 1):
         if hPixels[x, y][0] > max_hDiff:
             max_hDiff = hPixels[x, y][0]
 
-if args.dh:
+if args.dh or args.da:
     hDiffIm.show()
-    if args.sv:
-        hDiffIm.save(saveBase + "ah.jpg", format="JPEG", quality=95)
+
+if args.sv:
+    hDiffIm.save(saveBase + "ah.jpg", format="JPEG", quality=95)
+
 print("Horizontal edges version done.", max_hDiff,  str(datetime.now()))
+
+#
+# Generate a heat map of the maxium pixel differences.
+#
+mDiffIm = Image.new('RGB', im.size, background)
+mdPixels = mDiffIm.load()
+
+# list to allow histogram generation of differences
+mdHisto = []
+
+# Get maxium intensity differences between pixel and all eight neighbors
+max_mDiff = 0
+for x in range(1, im.size[0] - 1):
+    for y in range(1, im.size[1] - 1):
+        mdPixels[x, y] = getMaxDiff(gAvgIm, x, y)
+        mdp0 = mdPixels[x, y][0]
+        mdHisto.append(mdp0)
+        if mdp0 > max_mDiff:
+            max_mDiff = mdp0
+
+mDiffIm.show()
+
+mDiffIm.save(saveBase + "amd.jpg", format="JPEG", quality=95)
+
+print("MaxDiff version done.", max_mDiff,  str(datetime.now()))
+
+# Use matplotlib to plot the same data as a histogram.
+mdHisto_fig, mdHisto_ax = plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
+mdHisto_ax.hist(mdHisto, bins=256)
+
+for x in range(im.size[0]):
+    for y in range(im.size[1]):
+#        mdPixels[x, y] = colors[mdPixels[x, y][0]]
+        mdPixels[x, y] = heatmap[mdPixels[x, y][0] % hm_len]
+
+mDiffIm.show()
+
+mDiffIm.save(saveBase + "ahm.jpg", format="JPEG", quality=95)
+
+print("MaxDiff heatmap version done.", max_mDiff,  str(datetime.now()))
+
+# Apply calculated edges to heat map
+for x in range(im.size[0]):
+    for y in range(im.size[1]):
+        if (vPixels[x, y][0] > threshhold) or (hPixels[x, y][0] > threshhold):
+            mdPixels[x, y] = (0,0,0)
+
+mDiffIm.show()
+
+mDiffIm.save(saveBase + "ahme.jpg", format="JPEG", quality=95)
+
+print("MaxDiff edged heatmap version done.", str(datetime.now()))
 
 # match a palette to the maximum edge differences
 pal_len = max(max_vDiff, max_hDiff) + 1
@@ -342,7 +439,8 @@ fPixels = funkyIm.load()
 afunkyIm = Image.new('RGB', im.size, background)
 afPixels = afunkyIm.load()
 
-threshhold = args.th
+# NOTE: While overlaying the edges on the posterized versions,
+#       also create a maxed edges version, and a colored edges version
 for x in range(0, im.size[0]):
     # NOTE: Use the vertical differences image to keep track of edge pixels used
     for y in range(0, im.size[1]):
@@ -354,7 +452,7 @@ for x in range(0, im.size[0]):
             # Edge pixel, colorize based on brightness
             diffColor = max(vPixels[x, y][0], hPixels[x, y][0])
             hPixels[x, y] = diffColors[diffColor]
-            # Edge pixel, make white
+            # Edge pixel, make white (max)
             vPixels[x, y] = (255, 255, 255)
         else:
             bright = gaPixels[x, y][0]
@@ -368,10 +466,12 @@ for x in range(0, im.size[0]):
         afPixels[x, y] = apixel
 
 # Display and save the representation of the edges.
-if args.se:
-    vDiffIm.show()
-    vDiffIm.save(saveBase + "ae.jpg", format="JPEG", quality=95)
+if args.da:
     hDiffIm.show()
+    vDiffIm.show()
+
+if args.se or args.sv:
+    vDiffIm.save(saveBase + "ae.jpg", format="JPEG", quality=95)
     hDiffIm.save(saveBase + "aec.jpg", format="JPEG", quality=95)
 
 funkyIm.show()
@@ -385,3 +485,9 @@ print("Anti-posterized and edged version done.")
 # Display and save the smoothed and edged version of the original image
 avgIm.show()
 avgIm.save(saveBase + "se.jpg", format="JPEG", quality=95)
+
+# And make the histogram plot visible.
+if args.hi:
+    plt.show()
+    print("Histogram plot generated. Close histogram window to end program.")
+
