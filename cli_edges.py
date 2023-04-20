@@ -172,6 +172,9 @@ parser.add_argument('--se', action='store_true', help="autosave edges image")
 # Optional argument to display the maxDiffs histogram
 parser.add_argument('--hi', action='store_true', help="display histogram")
 
+# Optional argument to quiet all displays
+parser.add_argument('--q', action='store_true', help="quiet mode (no displays)")
+
 args = parser.parse_args()
 print("fn\t", args.fn)
 print("pn\t", args.pn)
@@ -188,6 +191,10 @@ print("dh\t", args.dh)
 print("sv\t", args.sv)
 print("se\t", args.se)
 print("hi\t", args.hi)
+print("q\t", args.q)
+
+# Allows enabled displays if not in quiet mode
+loud = not args.q
 
 # open the file into an image object.
 im = Image.open(args.fn)
@@ -212,7 +219,7 @@ for c in range(palette_length):
 for color in colors:
     anticolors.append(invert(color))
 
-if args.do or args.da:
+if (args.do or args.da) and loud:
     im.show()
     print("Original version, for comparisons.",  str(datetime.now()))
 
@@ -250,7 +257,7 @@ for x in range(0, im.size[0]):
         pPixels[x, y] = colors[bright]
         iPixels[x, y] = anticolors[bright]
 
-if args.dp or args.da:
+if (args.dp or args.da) and loud:
     pIm.show()
     iIm.show()
 
@@ -280,7 +287,7 @@ if genGS:
             bright = get_brightness(im.getpixel((x, y)))
             gPixels[x, y] = grays[bright]
 
-if args.dgs or args.da:
+if (args.dgs or args.da) and loud:
     gIm.show()
 
 if args.sv and genGS:
@@ -325,7 +332,7 @@ if genAvg:
         for y in range(margin, im.size[1] - other_margin):
             aPixels[x, y] = getAverage(im, x, y, args.bs)
 
-if args.ds or args.da:
+if (args.ds or args.da) and loud:
     avgIm.show()
 
 if args.sv and genAvg:
@@ -350,7 +357,7 @@ if genGAvg:
         for y in range(margin, im.size[1] - other_margin):
             gaPixels[x, y] = grays[get_brightness(aPixels[x, y])]
         
-if args.dsgs or args.da:
+if (args.dsgs or args.da) and loud:
     gAvgIm.show()
 
 if args.sv and genGAvg:
@@ -383,7 +390,7 @@ for x in range(1, im.size[0] - 1):
         if vPixels[x, y][0] > max_vDiff:
             max_vDiff = vPixels[x, y][0]
 
-if args.dv or args.da:
+if (args.dv or args.da) and loud:
     vDiffIm.show()
 
 if args.sv and genVDiff:
@@ -414,7 +421,7 @@ for x in range(1, im.size[0] - 1):
         if hPixels[x, y][0] > max_hDiff:
             max_hDiff = hPixels[x, y][0]
 
-if args.dh or args.da:
+if (args.dh or args.da) and loud:
     hDiffIm.show()
 
 if args.sv and genHDiff:
@@ -442,7 +449,8 @@ if genMDiff:
         for y in range(1, im.size[1] - 1):
             mdPixels[x, y] = getMaxDiff(gAvgIm, x, y)
 
-mDiffIm.show()
+if loud:
+    mDiffIm.show()
 
 if genMDiff:
     mDiffIm.save(saveBase + "amd.jpg", format="JPEG", quality=95)
@@ -491,8 +499,9 @@ for x in range(im.size[0]):
             print(e)
             print("index =", mdPixels[x, y][0])
             print("len(hm_colors) =", len(hm_colors))
-            
-mDiffIm.show()
+
+if loud:
+    mDiffIm.show()
 
 mDiffIm.save(savePalBase + "ahm.jpg", format="JPEG", quality=95)
 
@@ -504,7 +513,8 @@ for x in range(im.size[0]):
         if (vPixels[x, y][0] > threshhold) or (hPixels[x, y][0] > threshhold):
             mdPixels[x, y] = (0,0,0)
 
-mDiffIm.show()
+if loud:
+    mDiffIm.show()
 
 mDiffIm.save(saveBase + "ahme.jpg", format="JPEG", quality=95)
 
@@ -558,7 +568,7 @@ for x in range(0, im.size[0]):
         afPixels[x, y] = apixel
 
 # Display and save the representation of the edges.
-if args.da:
+if args.da and loud:
     hDiffIm.show()
     vDiffIm.show()
 
@@ -566,20 +576,26 @@ if args.se or args.sv:
     vDiffIm.save(savePalBase + "ae.jpg", format="JPEG", quality=95)
     hDiffIm.save(savePalBase + "aec.jpg", format="JPEG", quality=95)
 
-funkyIm.show()
-funkyIm.save(saveBase + "ap.jpg", format="JPEG", quality=95)
+if loud:
+    funkyIm.show()
+
+funkyIm.save(savePalBase + "ap.jpg", format="JPEG", quality=95)
 print("Posterized and edged version done.",  str(datetime.now()))
 
-afunkyIm.show()
+if loud:
+    afunkyIm.show()
+
 afunkyIm.save(savePalBase + "api.jpg", format="JPEG", quality=95)
 print("Anti-posterized and edged version done.")
 
 # Display and save the smoothed and edged version of the original image
-avgIm.show()
+if loud:
+    avgIm.show()
+
 avgIm.save(saveBase + "se.jpg", format="JPEG", quality=95)
 
 # And make the histogram plot visible.
-if args.hi:
+if args.hi and loud:
     # Use matplotlib to plot the same data as a histogram.
     mdHisto_fig, mdHisto_ax = plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
     counts, bins, patches = mdHisto_ax.hist(mdHisto, bins=len(pixel_dict))
