@@ -1,14 +1,69 @@
 #! /Library/Frameworks/Python.framework/Versions/3.9/bin/python3
 
 import argparse
+import json
 
 import matplotlib.pyplot as plt
 
+from matplotlib.colors import LinearSegmentedColormap
 from datetime import datetime
 from datetime import date
 from pathlib import Path
 from PIL import Image
 from os.path import exists
+from random import randint
+
+def createCDict(colors):
+    # Create an evenly spaced cdict dictionary from a list of colors
+    clen = len(colors)
+    count = clen - 1
+    increment = (1 / count)
+
+    cdict = dict()
+
+    # each keyword in cdict points to a list of lists, start with empty lists
+    cdict['red'] = list()
+    cdict['green'] = list()
+    cdict['blue'] = list()
+
+    # Start with x anchor points
+    # NOTE: Each anchor point is a separate list, hence the [] wrappers
+    for step in range(clen):
+        cdict['red'].append([step * increment])
+        cdict['green'].append([step * increment])
+        cdict['blue'].append([step * increment])
+
+    # now add in the colors
+    # NOTE: duplicates because of colormap dict definition needing yleft, and yright
+    for color in range(clen):
+        cdict['red'][color].append(colors[color][0] / 255)
+        cdict['red'][color].append(colors[color][0] / 255)
+        cdict['green'][color].append(colors[color][1] / 255)
+        cdict['green'][color].append(colors[color][1] / 255)
+        cdict['blue'][color].append(colors[color][2] / 255)
+        cdict['blue'][color].append(colors[color][2] / 255)
+
+    return(cdict)
+
+
+def custCM(cdict, name):
+    # Create a custom colormap from a color dictionary
+    return(LinearSegmentedColormap(name, segmentdata=cdict, N=256))
+
+
+def palette(cm):
+    # Create a 256 length palette from a colormap
+    ncColors = []
+
+    for c in range(256):
+        color = cm(c / 255)
+        r = int(color[0] * 255)
+        g = int(color[1] * 255)
+        b = int(color[2] * 255)
+        ncColors.append((r, g, b))
+
+    return(ncColors)
+
 
 def get_brightness(pixel):
     # Calculate luminosity of an (r, g, b) pixel
@@ -200,22 +255,48 @@ print("q\t", args.q)
 # Allows enabled displays if not in quiet mode
 loud = not args.q
 
-# poster and grayscale lookup tables
-palette_length = 256
-colors = []
+colors = list()
+colorized = list()
+cm = None
+
+# Test for custom palette
+cpPath = Path(args.pn)
+if cpPath.exists():
+    # It's a file,read in the JSONized palette
+    cpFP = open(args.pn)
+    pData = json.load(cpFP)
+
+    # convert JSON lists to tuples for the palette
+    for d in pData:
+        colors.append(tuple(d))
+
+    # create the expected reversed palette for later use
+    cLen = len(colors)
+    cLenM1 = cLen - 1
+    for c in range(cLen):
+        colorized.append(colors[cLenM1 - c])
+
+    # create a color map for heatmap later
+    cm = custCM(createCDict(colors), "heatmap")
+
+    # strip .json extension from palette name
+    args.pn = args.pn.split('.')[0]
+else:
+    # Use MatPlotLib colormap to query colormap for colors, save in look up tables
+    cm = plt.cm.get_cmap(args.pn)
+
+    # poster and grayscale lookup tables
+    colors = palette(cm)
+
+    # get reversed colormap and palette
+    acm = plt.cm.get_cmap(args.pn + "_r")
+    colorized = palette(acm)
+
+# Create generic grayscale palette
+grays = [(x, x, x) for x in range(len(colors))]
+
+# create the inverse of the color palette
 anticolors = []
-grays = [(x, x, x) for x in range(palette_length)]
-
-# Use MatPlotLib colormap to query colormap for colors, save in look up tables
-cm = plt.cm.get_cmap(args.pn)
-pl_max = palette_length - 1
-for c in range(palette_length):
-    color = cm(c / pl_max)
-    r = int(color[0] * 255)
-    g = int(color[1] * 255)
-    b = int(color[2] * 255)
-    colors.append((r, g, b))
-
 for color in colors:
     anticolors.append(invert(color))
 
@@ -458,6 +539,8 @@ if loud:
 if genMDiff:
     mDiffIm.save(saveBase + "amd.jpg", format="JPEG", quality=95)
 
+saveMD = mDiffIm.copy()
+
 print("MaxDiff version done.", str(datetime.now()))
 #print(sorted(pixel_dict.items(), reverse=True))
 
@@ -483,28 +566,6 @@ print("pixel diff count:", len(pixel_dict))
 
 threshhold = args.th
 
-# build colorized palette (reverse palette below threshhold, colormap above)
-colorized = []
-
-# get reversed colormap
-acm = plt.cm.get_cmap(args.pn + "_r")
-for c in range(threshhold):
-    color = acm(c / max_mDiff)
-    r = int(color[0] * 255)
-    g = int(color[1] * 255)
-    b = int(color[2] * 255)
-    colorized.append((r, g, b))
-
-for c in range(threshhold, 256):
-    color = cm(c / max_mDiff)
-    r = int(color[0] * 255)
-    g = int(color[1] * 255)
-    b = int(color[2] * 255)
-    colorized.append((r, g, b))
-
-print("colorized len", len(colorized))
-#print(colorized)
-
 # creat a canvas for "colorized" version
 cIm = Image.new('RGB', im.size, background)
 cPixels = cIm.load()
@@ -517,9 +578,9 @@ if (args.dc or args.da) and loud:
     cIm.show()
 
 if args.sv:
-    cIm.save(savePalBase + "c.jpg", format="JPEG", quality=95)
+    cIm.save(savePalBase + "r.jpg", format="JPEG", quality=95)
 
-print("'Colorized' version done.")
+print("Reversed version done.")
 
 # create palette for heat map version
 hm_colors = []
@@ -633,92 +694,117 @@ if loud:
     avgIm.show()
 
 avgIm.save(saveBase + "se.jpg", format="JPEG", quality=95)
+print("Averaged and edged version done.")
 
-# Create palettes of the colors sorted by brightness
-s_colors = sorted(colors, key=lambda x:(get_brightness(x)))
-rs_colors = sorted(colors, key=lambda x:(get_brightness(x)), reverse=True)
-as_colors = sorted(anticolors, key=lambda x:(get_brightness(x)))
-ras_colors = sorted(anticolors, key=lambda x:(get_brightness(x)), reverse=True)
-
-# Create a version using the sorted color palette
-sIm = Image.new('RGB', im.size, background)
-sPixels = sIm.load()
-
-# use the sorted palette
-for x in range(im.size[0]):
-    for y in range(im.size[1]):
-        # use the grayscale value as look up into the sorted by brightness palette
-        sPixels[x, y] = s_colors[gaPixels[x, y][0]]
-
-if loud:
-    sIm.show()
-
-sIm.save(savePalBase + "as.jpg", format="JPEG", quality=95)
-
-# Create an averaged version using the sorted color palette
-bIm = Image.new('RGB', im.size, background)
-bPixels = bIm.load()
-
-# use the sorted palette
-for x in range(margin, im.size[0] - other_margin):
-    for y in range(margin, im.size[1] - other_margin):
-        # smooth the image generated by the smoothed brightness palette
-        bPixels[x, y] = getAverage(sIm, x, y, args.bs)
-
-if loud:
-    bIm.show()
-
-bIm.save(savePalBase + "ab.jpg", format="JPEG", quality=95)
-
-for x in range(im.size[0]):
-    for y in range(im.size[1]):
-        # apply calculated edges to smoothed, sorted palette image
-        if (vPixels[x, y][0] > 0):
-            bPixels[x, y] = (0, 0, 0)
-
-if loud:
-    bIm.show()
-
-bIm.save(savePalBase + "abe.jpg", format="JPEG", quality=95)
-
-# use the reverse sorted palette
-for x in range(im.size[0]):
-    for y in range(im.size[1]):
-        # use the grayscale value as look up into the sorted by brightness palette
-        sPixels[x, y] = rs_colors[gaPixels[x, y][0]]
-
-if loud:
-    sIm.show()
-
-sIm.save(savePalBase + "ars.jpg", format="JPEG", quality=95)
-
-# use the sorted antipalette
-for x in range(im.size[0]):
-    for y in range(im.size[1]):
-        # use the grayscale value as look up into the sorted by brightness palette
-        sPixels[x, y] = as_colors[gaPixels[x, y][0]]
-
-if loud:
-    sIm.show()
-
-sIm.save(savePalBase + "aas.jpg", format="JPEG", quality=95)
-
-# use the reverse sorted antipalette
-for x in range(im.size[0]):
-    for y in range(im.size[1]):
-        # use the grayscale value as look up into the sorted by brightness palette
-        sPixels[x, y] = ras_colors[gaPixels[x, y][0]]
-
-if loud:
-    sIm.show()
-
-sIm.save(savePalBase + "aras.jpg", format="JPEG", quality=95)
-
-# And make the histogram plot visible.
 if args.hi:
     # Use matplotlib to plot the same data as a histogram.
     mdHisto_fig, mdHisto_ax = plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
     counts, bins, patches = mdHisto_ax.hist(mdHisto, bins=len(pixel_dict))
 
+    # And make the histogram plot visible.
     plt.show()
     print("Histogram plot generated. Close histogram window to end program.")
+
+
+def sobel_hPlane(im, x, y):
+    # Apply horizontal Sobel mask on a single color plane.
+    # [ 1,  2,  1]
+    # [ 0,  0,  0]
+    # [-1, -2, -1] 
+    v = im.getpixel((x - 1, y - 1))[0]
+    v += 2 * im.getpixel((x, y - 1))[0]
+    v += im.getpixel((x + 1, y - 1))[0]
+    v -= im.getpixel((x - 1, y + 1))[0]
+    v -= 2 * im.getpixel((x, y + 1))[0]
+    v -= im.getpixel((x + 1, y + 1))[0]
+
+    return(v)
+
+
+def sobel_vPlane(im, x, y):
+    # Apply Sobel mask on a single color plane.
+    # [-1,  0,  1]
+    # [-2,  0,  2]
+    # [-1, -0,  1]
+    v = 0
+    v -= im.getpixel((x - 1, y - 1))[0]
+    v += im.getpixel((x + 1, y - 1))[0]
+    v -= 2 * im.getpixel((x - 1, y))[0]
+    v += 2 * im.getpixel((x + 1, y))[0]
+    v -= im.getpixel((x - 1, y + 1))[0]
+    v += im.getpixel((x + 1, y + 1))[0]
+
+    return(v)
+
+
+def sobel(im, x, y):
+    r1 = sobel_hPlane(im, x, y)
+    r2 = sobel_vPlane(im, x, y)
+
+    # Sobel gradient r = sqrt(r1**2 + r2**2)
+    r = int(((r1 * r1) + (r2 * r2))**0.5)
+
+    return((r, r, r))
+
+sobelIm = Image.new('RGB', im.size, background)
+sobelPixels = sobelIm.load()
+
+maxR = 0
+for x in range(1, gAvgIm.size[0] - 1):
+    for y in range(1, gAvgIm.size[1] - 1):
+        sobelPixels[x, y] = pixel = sobel(gAvgIm, x, y)
+        c0 = pixel[0]
+        if c0 > maxR:
+            maxR = c0
+
+print('maxR =', maxR)
+
+gShmColors = list()
+
+# build color look up tables so that we don't do much math on each pixel
+for c in range(maxR):
+    # Binary grayscale: max > args.th, 0 <= th
+    g = int((c / maxR) * 255)
+    if g > args.th:
+        g = 255
+    else:
+        g = 0
+    gShmColors.append((g, g, g))
+
+gShmIm = Image.new('RGB', im.size, background)
+gShmPixels = gShmIm.load()
+
+for x in range(gAvgIm.size[0]):
+    for y in range(gAvgIm.size[1]):
+        sPix = sobelPixels[x, y][0]
+        gShmPixels[x, y] = gShmColors[sPix]
+
+if loud:
+    gShmIm.show()
+
+gShmIm.save(saveBase + "sobel.jpg", format="JPEG", quality=95)
+
+# Now do posterized and antiposterized versions using sobel edges
+sPostIm = Image.new('RGB', im.size, background)
+sPostPixels = sPostIm.load()
+
+sAntiIm = Image.new('RGB', im.size, background)
+sAntiPixels = sAntiIm.load()
+
+for x in range(im.size[0]):
+    for y in range(im.size[1]):
+        if gShmPixels[x, y][0] > 0:
+            sPostPixels[x, y] = (0, 0, 0)
+            sAntiPixels[x, y] = (0, 0, 0)
+        else:
+            sPostPixels[x, y] = colors[gaPixels[x, y][0]]
+            sAntiPixels[x, y] = anticolors[gaPixels[x, y][0]]
+
+if loud:
+    sPostIm.show()
+    sAntiIm.show()
+
+sPostIm.save(savePalBase + "psobel.jpg", format="JPEG", quality=95)
+sAntiIm.save(savePalBase + "pisobel.jpg", format="JPEG", quality=95)
+print("Posterized and sobel edged version done.")
+print("Inverted posterized and sobel edged version done.")

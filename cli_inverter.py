@@ -84,7 +84,6 @@ if not saveDir.exists():
     saveDir.mkdir()
 
 # Build the base file name string
-#fn = args.fn.split(".")
 fullname = basename(args.fn)
 nameParts = fullname.split(".")
 name = ""
@@ -102,14 +101,13 @@ oIm = Image.open(args.fn)
 pixels = oIm.load()
 
 # create a canvas for the manipulated file
-# create a canvas to posterize into
 iIm = Image.new('RGB', oIm.size, background)
 iPixels = iIm.load()
 
+# do any requested inversions
 for x in range(0, oIm.size[0]):
     for y in range(0, oIm.size[1]):
         r, g, b = pixels[x, y]
-#        print(r, g, b)
         iPixels[x, y] = (reds[r], greens[g], blues[b])
 
 iIm.show()
