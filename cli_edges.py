@@ -156,6 +156,50 @@ def getMaxDiff(im, x, y):
     return((diff, diff, diff))
 
 
+# Calculate the horizontal portion of a Sobel gradient
+def sobel_hPlane(im, x, y):
+    # Apply horizontal Sobel mask on a single color plane.
+    # [ 1,  2,  1]
+    # [ 0,  0,  0]
+    # [-1, -2, -1] 
+    v = im.getpixel((x - 1, y - 1))[0]
+    v += 2 * im.getpixel((x, y - 1))[0]
+    v += im.getpixel((x + 1, y - 1))[0]
+    v -= im.getpixel((x - 1, y + 1))[0]
+    v -= 2 * im.getpixel((x, y + 1))[0]
+    v -= im.getpixel((x + 1, y + 1))[0]
+
+    return(v)
+
+
+# Calculate the vertical portion of a Sobel gradient
+def sobel_vPlane(im, x, y):
+    # Apply Sobel mask on a single color plane.
+    # [-1,  0,  1]
+    # [-2,  0,  2]
+    # [-1, -0,  1]
+    v = 0
+    v -= im.getpixel((x - 1, y - 1))[0]
+    v += im.getpixel((x + 1, y - 1))[0]
+    v -= 2 * im.getpixel((x - 1, y))[0]
+    v += 2 * im.getpixel((x + 1, y))[0]
+    v -= im.getpixel((x - 1, y + 1))[0]
+    v += im.getpixel((x + 1, y + 1))[0]
+
+    return(v)
+
+
+# Calculate Sobel gradient for a pixel
+def sobel(im, x, y):
+    r1 = sobel_hPlane(im, x, y)
+    r2 = sobel_vPlane(im, x, y)
+
+    # Sobel gradient r = sqrt(r1**2 + r2**2)
+    r = int(((r1 * r1) + (r2 * r2))**0.5)
+
+    return((r, r, r))
+
+
 print("Starting processing now:",  str(datetime.now()))
 
 # background default
@@ -232,6 +276,9 @@ parser.add_argument('--hi', action='store_true', help="display histogram")
 
 # Optional argument to quiet all displays
 parser.add_argument('--q', action='store_true', help="quiet mode (no displays)")
+
+# Optional argument to create watermarked files, as well
+parser.add_argument('--wm', action='store_true', help="create watermarked files")
 
 args = parser.parse_args()
 print("fn\t", args.fn)
@@ -326,6 +373,12 @@ pixels = im.load()
 if (args.do or args.da) and loud:
     im.show()
     print("Original version, for comparisons.",  str(datetime.now()))
+
+wmIm = None
+loc = (0, 0)
+if args.wm:
+    wmIm = Image.open("watermark.png")
+    loc = ((im.size[0] - wmIm.size[0]), (im.size[1] - wmIm.size[1]))
 
 # posterized images
 # create a canvas to posterize into
@@ -706,85 +759,63 @@ if args.hi:
     print("Histogram plot generated. Close histogram window to end program.")
 
 
-def sobel_hPlane(im, x, y):
-    # Apply horizontal Sobel mask on a single color plane.
-    # [ 1,  2,  1]
-    # [ 0,  0,  0]
-    # [-1, -2, -1] 
-    v = im.getpixel((x - 1, y - 1))[0]
-    v += 2 * im.getpixel((x, y - 1))[0]
-    v += im.getpixel((x + 1, y - 1))[0]
-    v -= im.getpixel((x - 1, y + 1))[0]
-    v -= 2 * im.getpixel((x, y + 1))[0]
-    v -= im.getpixel((x + 1, y + 1))[0]
+# Sobel Filter
+gShmIm = None
+genSobel = True
 
-    return(v)
+if exists(saveBase + "esobel.jpg"):
+    # already generated a grayscale image and saved it, use it
+    gShmIm = Image.open(saveBase + "esobel.jpg")
+    genSobel = False
+    print("Opened saved file:", saveBase + "esobel.jpg")
+else:
+    # creat a canvas for Sobel gradient calculations
+    sobelIm = Image.new('RGB', im.size, background)
+    sobelPixels = sobelIm.load()
 
+    maxR = 0
+    for x in range(1, gAvgIm.size[0] - 1):
+        for y in range(1, gAvgIm.size[1] - 1):
+            sobelPixels[x, y] = pixel = sobel(gAvgIm, x, y)
+            c0 = pixel[0]
+            if c0 > maxR:
+                maxR = c0
 
-def sobel_vPlane(im, x, y):
-    # Apply Sobel mask on a single color plane.
-    # [-1,  0,  1]
-    # [-2,  0,  2]
-    # [-1, -0,  1]
-    v = 0
-    v -= im.getpixel((x - 1, y - 1))[0]
-    v += im.getpixel((x + 1, y - 1))[0]
-    v -= 2 * im.getpixel((x - 1, y))[0]
-    v += 2 * im.getpixel((x + 1, y))[0]
-    v -= im.getpixel((x - 1, y + 1))[0]
-    v += im.getpixel((x + 1, y + 1))[0]
+    print('maxR =', maxR)
 
-    return(v)
+    gShmColors = list()
 
+    # build color look up tables so that we don't do much math on each pixel
+    for c in range(maxR):
+        # Binary grayscale: max > args.th, 0 <= th
+        g = int((c / maxR) * 255)
+        if g > args.th:
+            g = 255
+        else:
+            g = 0
+        gShmColors.append((g, g, g))
 
-def sobel(im, x, y):
-    r1 = sobel_hPlane(im, x, y)
-    r2 = sobel_vPlane(im, x, y)
+    # Create canvas for Sobel Filtered image
+    gShmIm = Image.new('RGB', im.size, background)
 
-    # Sobel gradient r = sqrt(r1**2 + r2**2)
-    r = int(((r1 * r1) + (r2 * r2))**0.5)
-
-    return((r, r, r))
-
-sobelIm = Image.new('RGB', im.size, background)
-sobelPixels = sobelIm.load()
-
-maxR = 0
-for x in range(1, gAvgIm.size[0] - 1):
-    for y in range(1, gAvgIm.size[1] - 1):
-        sobelPixels[x, y] = pixel = sobel(gAvgIm, x, y)
-        c0 = pixel[0]
-        if c0 > maxR:
-            maxR = c0
-
-print('maxR =', maxR)
-
-gShmColors = list()
-
-# build color look up tables so that we don't do much math on each pixel
-for c in range(maxR):
-    # Binary grayscale: max > args.th, 0 <= th
-    g = int((c / maxR) * 255)
-    if g > args.th:
-        g = 255
-    else:
-        g = 0
-    gShmColors.append((g, g, g))
-
-gShmIm = Image.new('RGB', im.size, background)
 gShmPixels = gShmIm.load()
 
-for x in range(gAvgIm.size[0]):
-    for y in range(gAvgIm.size[1]):
-        sPix = sobelPixels[x, y][0]
-        gShmPixels[x, y] = gShmColors[sPix]
+if genSobel:
+    for x in range(gAvgIm.size[0]):
+        for y in range(gAvgIm.size[1]):
+            sPix = sobelPixels[x, y][0]
+            gShmPixels[x, y] = gShmColors[sPix]
 
 if loud:
     gShmIm.show()
 
-gShmIm.save(saveBase + "sobel.jpg", format="JPEG", quality=95)
+if genSobel:
+    gShmIm.save(saveBase + "esobel.jpg", format="JPEG", quality=95)
 
-# Now do posterized and antiposterized versions using sobel edges
+# Now do averaged, posterized, and antiposterized versions using sobel edges
+sAvgIm = Image.new('RGB', im.size, background)
+sAvgPixels = sAvgIm.load()
+
 sPostIm = Image.new('RGB', im.size, background)
 sPostPixels = sPostIm.load()
 
@@ -794,17 +825,39 @@ sAntiPixels = sAntiIm.load()
 for x in range(im.size[0]):
     for y in range(im.size[1]):
         if gShmPixels[x, y][0] > 0:
+            sAvgPixels[x, y] = (0, 0, 0)
             sPostPixels[x, y] = (0, 0, 0)
             sAntiPixels[x, y] = (0, 0, 0)
         else:
+            sAvgPixels[x, y] = aPixels[x, y]
             sPostPixels[x, y] = colors[gaPixels[x, y][0]]
             sAntiPixels[x, y] = anticolors[gaPixels[x, y][0]]
 
 if loud:
+    sAvgIm.show()
     sPostIm.show()
     sAntiIm.show()
 
+sAvgIm.save(saveBase + "asobel.jpg", format="JPEG", quality=95)
+print("Averaged and sobel edged version done.")
 sPostIm.save(savePalBase + "psobel.jpg", format="JPEG", quality=95)
-sAntiIm.save(savePalBase + "pisobel.jpg", format="JPEG", quality=95)
 print("Posterized and sobel edged version done.")
+sAntiIm.save(savePalBase + "pisobel.jpg", format="JPEG", quality=95)
 print("Inverted posterized and sobel edged version done.")
+
+if args.wm:
+    sAvgIm.paste(wmIm, loc, wmIm)
+    sPostIm.paste(wmIm, loc, wmIm)
+    sAntiIm.paste(wmIm, loc, wmIm)
+
+    if loud:
+        sAvgIm.show()
+        sPostIm.show()
+        sAntiIm.show()
+
+    sAvgIm.save(saveBase + "asobel_wm.jpg", format="JPEG", quality=95)
+    print("Watermarked averaged and sobel edged version done.")
+    sPostIm.save(savePalBase + "psobel_wm.jpg", format="JPEG", quality=95)
+    print("Watermarked posterized and sobel edged version done.")
+    sAntiIm.save(savePalBase + "pisobel_wm.jpg", format="JPEG", quality=95)
+    print("Watermarked inverted posterized and sobel edged version done.")
