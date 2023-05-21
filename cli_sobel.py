@@ -123,6 +123,7 @@ def lumData(im, name, bord=0):
     if lumPath.exists():
         lpFP = open(name, "rb")
         lums = np.load(lpFP)
+        print(str(datetime.now()), "Using saved file:", name)
     else:
         # Calculate input image pixel luminosities
         lums = np.zeros(im.size).astype(int)
@@ -181,6 +182,7 @@ def getImage(npa, name, palette, display=False, save=False, bord=0):
     if imPath.exists():
         # read image
         im = Image.open(name)
+        print(str(datetime.now()), "Using saved file:", name)
     else:
         # create image
         im = processImage(npa,
@@ -221,6 +223,7 @@ def getSmoothImage(im, name, display=False, save=False, border=0):
     if sImPath.exists():
         # read image
         sIm = Image.open(name)
+        print(str(datetime.now()), "Using saved file:", name)
     else:
         # create image
         sIm = smoothImage(im,
@@ -293,6 +296,7 @@ def getEdges(im, name, bord=0):
     if ePath.exists():
         epFP = open(name, "rb")
         edges = np.load(epFP)
+        print(str(datetime.now()), "Using saved file:", name)
     else:
         # Calculate input image pixel luminosities
         edges = np.zeros(im.size).astype(int)
@@ -341,12 +345,12 @@ def edgesImage(edges, name, palette, display=False, save=False, border=0):
     return(newIm)
 
 
-def applyEdges(im, npa, name, th, display=False, save=False, border=0):
+def applyEdges(im, edges, name, th, display=False, save=False, border=0):
     # Create, and possibly display, and possibly save, an image
     # by applying the provided sobel edges values to the provide image
 
     # Create canvas for new image
-    newIm = Image.new('RGB', npa.shape, BACKGROUND)
+    newIm = Image.new('RGB', im.size, BACKGROUND)
     newPixels = newIm.load()
 
     # get the input image
@@ -416,6 +420,9 @@ if __name__ == '__main__':
     # Optional argument to display grayscale smoothed image
     parser.add_argument('--dsgs', action='store_true', help="display smoothed grayscale")
 
+    # Optional argument to display weighted palette eedges image
+    parser.add_argument('--dw', action='store_true', help="display weighted palette")
+
     # Optional argument to autosave all generated files
     parser.add_argument('--sa', action='store_true', help="autosave all generated images")
 
@@ -429,6 +436,9 @@ if __name__ == '__main__':
     parser.add_argument('--spe',
                         action='store_true',
                         help="autosave edged posterized image(s)")
+
+    # Optional argument to autosave the weighted palette edges image
+    parser.add_argument('--sw', action='store_true', help="autosave edges image")
 
     # Optional argument to also create an inverted palette, too
     parser.add_argument('--ci', action='store_true', help="create inverted palette image, too")
@@ -686,7 +696,7 @@ if __name__ == '__main__':
 
         print(str(datetime.now()), "Edged smoothed posterized invert image done.")
 
-    # No palette used, no threshhold used, so simple filename 
+#    print("sIm:", str(sIm.size), " normEdges:", normEdges.shape)
     esIm = applyEdges(sIm,
                       normEdges,
                       saveThBase + "es.jpg",
@@ -697,3 +707,44 @@ if __name__ == '__main__':
                       )
 
     print(str(datetime.now()), "Edged smoothed image done.")
+
+    # Experimental code: trying to create a weighted palettee
+    
+    weighted = []
+    minE = np.min(edges)
+    maxE = np.max(edges)
+    histo, bins = np.histogram(edges, bins=maxE + 1)
+    totalEdges = histo.sum()
+    print("len(histo):", len(histo), "totalEdges", totalEdges)
+    runningTotal = 0
+    for i in range(len(histo)):
+        weight = int((runningTotal / totalEdges) * MAX_COLOR)
+        weighted.append(weight)
+        runningTotal += histo[i]
+
+    print("len(weighted):", len(weighted))
+    print(im.size, edges.shape)
+
+#            wImPixels[x, y] = colors[weighted[edges[x, y]]]
+
+    wIm = Image.new("RGB", edges.shape, BACKGROUND)
+    wImPixels = wIm.load()
+    for x in range(edges.shape[0]):
+        for y in range(edges.shape[1]):
+            # Actually edge gradient
+            ed = edges[x, y]
+            # get the weighted index value
+            try:
+                ind = weighted[ed]
+            except:
+                print(x, y)
+                print("ed:", ed)
+            # get the palette color for the pixel
+            wImPixels[x, y] = colors[ind]
+
+    if (args.da or args.dw):
+        wIm.show()
+        print(str(datetime.now()), "Weighted palette image done.")
+
+    if (args.sa or args.sw):
+        wIm.save(savePalBase + "w.jpg", format="JPEG", quality=95)
