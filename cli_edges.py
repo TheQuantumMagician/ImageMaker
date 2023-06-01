@@ -13,6 +13,41 @@ from PIL import Image
 from os.path import exists
 from random import randint
 
+# Scratch table to keep track of closest color matches
+lookup = dict()
+
+
+def get_distance(pixel, color):
+    # calculate three dimensional distance between colors
+    r = pixel[0] - color[0]
+    g = pixel[1] - color[1]
+    b = pixel[2] - color[2]
+    dist = (r**2 + g**2 + b**2)**0.5
+
+    return(dist)
+
+
+def get_closest(pixel, palette):    
+
+    if pixel in lookup:
+    # Have already mapped this pixel.
+        closest = lookup[pixel]
+    else:
+        # pick the closest color in the palette to the existing color
+        distance = 442      # 442 is maxiumum possible distance between colors 
+        closest = (0, 0, 0)
+
+        for color in palette:
+            dist = get_distance(pixel, color)
+            if dist < distance:
+                    distance = dist
+                    closest = color
+                    
+        lookup[pixel] = closest
+
+    return(closest)
+
+
 def createCDict(colors):
     # Create an evenly spaced cdict dictionary from a list of colors
     clen = len(colors)
@@ -757,7 +792,6 @@ if args.hi:
     # And make the histogram plot visible.
     plt.show()
     print("Histogram plot generated. Close histogram window to end program.")
-
 
 # Sobel Filter
 gShmIm = None

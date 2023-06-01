@@ -1,3 +1,4 @@
+#! /Library/Frameworks/Python.framework/Versions/3.9/bin/python3
 #
 # Apply a watermark image file to the lower right corner of an image file.
 #

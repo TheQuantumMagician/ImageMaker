@@ -55,14 +55,16 @@ def custCM(cdict, name):
 
 
 def palette(cm):
-    # Create a 256 length palette from a colormap
+    # Create a palette from a colormap
     ncColors = []
 
     for c in range(256):
         color = cm(c / 255)
+
         r = int(color[0] * 255)
         g = int(color[1] * 255)
         b = int(color[2] * 255)
+
         ncColors.append((r, g, b))
 
     return(ncColors)
@@ -121,56 +123,65 @@ def fullProcess(colors, name):
     writeColors(Colors, name)
 
 
+
 # Reddish, Greenish, Purplish
 RdGrPu = ((175, 5, 75), (135, 185, 0), (100, 45, 235))
-fullProcess(RdGrPu, 'RdGrPu')
+#fullProcess(RdGrPu, 'RdGrPu')
 
 # Neon Green, Hot Pink, Purplish
 NgHpPu = ((12, 255, 12), (215, 37, 222), (98, 88, 196))
-fullProcess(NgHpPu, 'NgHpPu')
+#fullProcess(NgHpPu, 'NgHpPu')
 
 # Blue, Orange, Green
 BlOrGr = ((5, 10, 100), (250, 115, 10), (120, 205, 40))
-fullProcess(BlOrGr, 'BlOrGr')
+#fullProcess(BlOrGr, 'BlOrGr')
 
 # Purplish, Bluish, Cyanish
 PuBlCy = ((75, 0, 110), (55, 120, 195), (130, 205, 255))
-fullProcess(PuBlCy, 'PuBlCy')
+#fullProcess(PuBlCy, 'PuBlCy')
+
+## Purplish, Bluish, Cyanish Extended
+PuBlCyE = ((75, 0, 110), (55, 120, 195), (130, 205, 255), (130, 205, 255))
+#fullProcess(PuBlCy, 'PuBlCyE')
 
 # Reddish, Orangish, Brown
 RdOrBr = ((230, 0, 0), (250, 115, 0), (140, 50, 5))
-fullProcess(RdOrBr, 'RdOrBr')
+#fullProcess(RdOrBr, 'RdOrBr')
+
+# Reddish, Orangish, Brown Extended
+RdOrBrE = ((230, 0, 0), (250, 115, 0), (140, 50, 5), (140, 50, 5))
+#fullProcess(RdOrBr, 'RdOrBrE')
 
 # Reddish, Orangish, Brown
 RdOrBl = ((230, 0, 0), (250, 115, 0), (5, 5, 230))
-fullProcess(RdOrBr, 'RdOrBl')
+#fullProcess(RdOrBr, 'RdOrBl')
 
 # Slate, Hot Pink, Bluish
 SlHpBl = ((35, 75, 100), (240, 15, 220), (5, 5, 230))
-fullProcess(SlHpBl, 'SlHpBl')
+#fullProcess(SlHpBl, 'SlHpBl')
 
 # Pale Green, Charcoal, Pink
 PgChPi = ((5, 160, 75), (90, 105, 110), (225, 80, 200))
-fullProcess(PgChPi, 'PgChPi')
+#fullProcess(PgChPi, 'PgChPi')
 
 # Orangish, Reddish, Purplish
 OrRdPu = ((225, 120, 5), (190, 65, 65), (95, 10, 235))
-fullProcess(OrRdPu, 'OrRdPu')
+#fullProcess(OrRdPu, 'OrRdPu')
 
 # cyclical RGB
 CR = ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 0, 0))
-fullProcess(CR, 'CR')
+#fullProcess(CR, 'CR')
 
 # RYGCBMR -- Cyclical Rainbow
-R = ((255, 0, 0),
-     (255, 255, 0),
-     (0, 255, 0),
-     (0, 255, 255),
-     (0, 0, 255),
-     (255, 0, 255),
-     (255, 0, 0),
+R = ((255, 0, 0),       # red
+     (255, 255, 0),     # yellow
+     (0, 255, 0),       # green
+     (0, 255, 255),     # cyan
+     (0, 0, 255),       # blue
+     (255, 0, 255),     # magenta
+     (255, 0, 0),       # red
      )
-fullProcess(R, 'R')
+#fullProcess(R, 'R')
 
 # RYGCBMMBCGYR rainbow
 IL = ((255, 0, 0),      # red
@@ -186,13 +197,184 @@ IL = ((255, 0, 0),      # red
       (255, 255, 0),    # yellow
       (255, 0, 0),      # red
       )
-fullProcess(IL, 'IL')
+#fullProcess(IL, 'IL')
 
-jList = list()
-jList.extend(PgChPi)
-jList.extend(RdOrBl)
-fullProcess(jList, "PgChPiRdOrBl")
+PgChPiRdOrBl = list()
+PgChPiRdOrBl.extend(PgChPi)
+PgChPiRdOrBl.extend(RdOrBl)
+#fullProcess(PgChPiRdOrBl, "PgChPiRdOrBl")
 
 # Gold, Magenta, Blue
 GoMaBl = ((245, 195, 5), (153, 0, 250), (5, 15, 205))
-fullProcess(GoMaBl, "GoMaBl")
+#fullProcess(GoMaBl, "GoMaBl")
+
+# Slate, Gray, Light Blue
+SlGyLb = ((100, 125, 145), (200, 205, 200), (150, 210, 255))
+#fullProcess(SlGyLb, "SlGyLb")
+
+# Slate, Gray, Light Blue Extended
+SlGyLbE = ((100, 125, 145), (200, 205, 200), (150, 210, 255), (150, 210, 255))
+#fullProcess(SlGyLbE, "SlGyLbE")
+
+# Banded Grayscale
+BGS = ((0, 0, 0),
+       (0, 0, 0),
+       (64, 64, 64),
+       (64, 64, 64),
+       (128, 128, 128),
+       (128, 128, 128),
+       (194, 194, 194),
+       (194, 194, 194),
+       (255, 255, 255),
+       (255, 255, 255),
+       )
+#fullProcess(BGS, "BGS")
+
+# Banded Grayscale and Rainbow
+BGSR = ((0, 0, 0),
+       (0, 0, 0),
+       (64, 64, 64),
+       (64, 64, 64),
+       (128, 128, 128),
+       (128, 128, 128),
+       (194, 194, 194),
+       (194, 194, 194),
+       (255, 255, 255),
+       (255, 255, 255),
+       (255, 0, 0),       # red
+       (255, 255, 0),     # yellow
+       (0, 255, 0),       # green
+       (0, 255, 255),     # cyan
+       (0, 0, 255),       # blue
+       (255, 0, 255),     # magenta
+       (255, 0, 0),       # red
+       )
+#fullProcess(BGSR, "BGSR")
+
+# Grayscale and Rainbow
+GSR = ((0, 0, 0),
+       (32, 32, 32),
+       (64, 64, 64),
+       (96, 96, 96),
+       (128, 128, 128),
+       (160, 160, 160),
+       (192, 192, 192),
+       (224, 224, 224),
+       (255, 255, 255),
+       (255, 0, 0),       # red
+       (255, 128, 0),     # orange
+       (255, 255, 0),     # yellow
+       (128, 255, 0),     # yellow-green
+       (0, 255, 0),       # green
+       (0, 255, 128),     # blue-green
+       (0, 255, 255),     # cyan
+       (0, 128, 255),     # aqua
+       (0, 0, 255),       # blue
+       (128, 0, 255),     # purple
+       (255, 0, 255),     # magenta
+       (255, 0, 128),     # maroon
+       (255, 0, 0),       # red
+       )
+#fullProcess(GSR, "GSR")
+
+# Grayscale and ROYG
+GSROYG = ((0, 0, 0),
+          (32, 32, 32),
+          (64, 64, 64),
+          (96, 96, 96),
+          (128, 128, 128),
+          (160, 160, 160),
+          (192, 192, 192),
+          (224, 224, 224),
+          (255, 255, 255),
+          (255, 0, 0),       # red
+          (255, 64, 0),
+          (255, 128, 0),     # orange
+          (255, 192, 0),
+          (255, 255, 0),     # yellow
+          (192, 255, 0),
+          (128, 255, 0),     # yellow-green
+          (64, 255, 0),
+          (0, 255, 0),       # green
+          (0, 0, 0),
+          )
+#fullProcess(GSROYG, "GSROYG")
+
+# Yellow, Red, Orange
+YRO = ((195, 185, 10),
+       (155, 5, 0),
+       (255, 170, 45),
+       )
+#fullProcess(YRO, "YRO")
+
+CBR = ((255, 0, 0),       # red
+       (255, 0, 0),       # red
+       (255, 128, 0),     # orange
+       (255, 255, 0),     # yellow
+       (255, 255, 0),     # yellow
+       (128, 255, 0),     # yellow-green
+       (0, 255, 0),       # green
+       (0, 255, 0),       # green
+       (0, 255, 128),     # blue-green
+       (0, 255, 255),     # cyan
+       (0, 255, 255),     # cyan
+       (0, 128, 255),     # aqua
+       (0, 0, 255),       # blue
+       (0, 0, 255),       # blue
+       (128, 0, 255),     # purple
+       (255, 0, 255),     # magenta
+       (255, 0, 255),     # magenta
+       (255, 0, 128),     # maroon
+       (255, 0, 0),       # red
+       )
+#fullProcess(CBR, "CBR")
+
+CBrOrYeRd = ((192, 96, 48),
+            (192, 96, 0),
+            (192, 192, 0),
+            (192, 0, 0),
+            (192, 96, 48),
+            )
+#fullProcess(CBrOrYeRd, "CBrOrYeRd")
+
+RdBk = ((255, 0, 0),
+      (0, 0, 0),
+      )
+#fullProcess(RdBk, "RdBk")
+
+BkRdBkGrBkBlBk = ((0, 0, 0),
+                (255, 0, 0),
+                (0, 0, 0),
+                (0, 255, 0),
+                (0, 0, 0),
+                (0, 0, 255),
+                (0, 0, 0),
+                )
+#fullProcess(BkRdBkGrBkBlBk, "BkRdBkGrBkBlBk")
+
+BkRdBkOrBkYeBk = ((0, 0, 0),
+                 (255, 0, 0),
+                 (0, 0, 0),
+                 (255, 128, 0),
+                 (0, 0, 0),
+                 (255, 255, 0),
+                 (0, 0, 0),
+                 )
+#fullProcess(BkRdBkOrBkYeBk, "BkRdBkOrBkYeBk")
+
+RdBkBl = ((255, 0, 0),
+          (0, 0, 0),
+          (0, 0, 255),
+          )
+#fullProcess(RdBkBl, "RdBkBl")
+
+RdWh = ((255, 0, 0),
+      (255, 255, 255),
+      )
+fullProcess(RdWh, "RdWh")
+
+RdWhBl = ((255, 0, 0),
+          (255, 255, 255),
+          (0, 0, 255),
+          )
+fullProcess(RdWhBl, "RdWhBl")

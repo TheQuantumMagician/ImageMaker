@@ -505,6 +505,13 @@ if __name__ == '__main__':
         for color in colors:
             anticolors.append(invert(color))
 
+    # Build reverse palettes (different from inverting, excpet for grayscale
+    r_colors = []
+    r_anticolors = []
+    for i in range(255, -1, -1):
+        r_colors.append(colors[i])
+        r_anticolors.append(anticolors[i])
+
     # Build image save filename strings
     # All files saved into a directory named from today's date (YYYYMMDD)
     today = date.today()
@@ -583,6 +590,26 @@ if __name__ == '__main__':
                         BORDER
                         )
         print(str(datetime.now()), "Posterized invert image done.")
+
+    # Generate reverse posterized and poster-invereted images
+    rpIm = getImage(lums,
+                    savePalBase + "rp.jpg",
+                    r_colors,
+                    (args.da or args.dp),
+                    (args.sa or args.sp),
+                    BORDER
+                    )
+    print(str(datetime.now()), "Reverse posterized image gone.")
+
+    if args.ci:
+        rpiIm = getImage(lums,
+                         savePalBase + "rpi.jpg",
+                         r_anticolors,
+                         (args.da or args.dp),
+                         (args.sa or args.sp),
+                         BORDER
+                         )
+        print(str(datetime.now()), "Reverse posterized invert image done.")
 
     # Generate a smoothed (averaged) version of the input image.
     sIm = getSmoothImage(im,
@@ -673,6 +700,26 @@ if __name__ == '__main__':
 
     print(str(datetime.now()), "Posterized invert edges image done.")
 
+    rcolEdges = edgesImage(normEdges,
+                           savePalBase + "rep.jpg",
+                           r_colors,
+                           args.da,
+                           (args.sa or args.spe),
+                           border=BORDER
+                           )
+
+    print(str(datetime.now()), "Reverse posterized edges image done.")
+
+    if args.ci:
+        rantiEdges = edgesImage(normEdges,
+                                savePalBase + "repi.jpg",
+                                r_anticolors,
+                                args.da,
+                                (args.sa or args.spe),
+                                border=BORDER
+                                )
+
+    print(str(datetime.now()), "Reverse posterized invert edges image done.")
     esPIm = applyEdges(sPIm,
                        normEdges,
                        savePalThBase + "esp.jpg",
@@ -708,43 +755,88 @@ if __name__ == '__main__':
 
     print(str(datetime.now()), "Edged smoothed image done.")
 
-    # Experimental code: trying to create a weighted palettee
-    
-    weighted = []
-    minE = np.min(edges)
-    maxE = np.max(edges)
-    histo, bins = np.histogram(edges, bins=maxE + 1)
-    totalEdges = histo.sum()
-    print("len(histo):", len(histo), "totalEdges", totalEdges)
-    runningTotal = 0
-    for i in range(len(histo)):
-        weight = int((runningTotal / totalEdges) * MAX_COLOR)
-        weighted.append(weight)
-        runningTotal += histo[i]
-
-    print("len(weighted):", len(weighted))
-    print(im.size, edges.shape)
-
-#            wImPixels[x, y] = colors[weighted[edges[x, y]]]
-
-    wIm = Image.new("RGB", edges.shape, BACKGROUND)
-    wImPixels = wIm.load()
-    for x in range(edges.shape[0]):
-        for y in range(edges.shape[1]):
-            # Actually edge gradient
-            ed = edges[x, y]
-            # get the weighted index value
-            try:
-                ind = weighted[ed]
-            except:
-                print(x, y)
-                print("ed:", ed)
-            # get the palette color for the pixel
-            wImPixels[x, y] = colors[ind]
-
-    if (args.da or args.dw):
-        wIm.show()
-        print(str(datetime.now()), "Weighted palette image done.")
-
-    if (args.sa or args.sw):
-        wIm.save(savePalBase + "w.jpg", format="JPEG", quality=95)
+#    # Experimental code: trying to create a weighted palettee
+#    
+#    weighted = []
+#    wShift = []
+#    minE = np.min(edges)
+#    maxE = np.max(edges)
+#    histo, bins = np.histogram(edges, bins=maxE + 1)
+#    totalEdges = histo.sum()
+#    print("len(histo):", len(histo), "totalEdges", totalEdges)
+#    runningTotal = 0
+#    rTShift = 0
+#    for i in range(len(histo)):
+#        inc = histo[i]
+#        rTShift += inc
+#        ws = int((rTShift / totalEdges) * MAX_COLOR)
+#        wShift.append(ws)
+#        weight = int((runningTotal / totalEdges) * MAX_COLOR)
+#        weighted.append(weight)
+#        runningTotal += inc
+#
+#    print("len(weighted):", len(weighted))
+#    print("len(wShift):", len(wShift))
+#    print(im.size, edges.shape)
+#
+##            wImPixels[x, y] = colors[weighted[edges[x, y]]]
+#
+#    wIm = Image.new("RGB", edges.shape, BACKGROUND)
+#    wImPixels = wIm.load()
+#
+#    wSIm = Image.new("RGB", edges.shape, BACKGROUND)
+#    wSImPixels = wSIm.load()
+#
+#    for x in range(edges.shape[0]):
+#        for y in range(edges.shape[1]):
+#            # Actually edge gradient
+#            ed = edges[x, y]
+#            # get the weighted index value
+#            ind = weighted[ed]
+#            indS = wShift[ed]
+#            # get the palette color for the pixel
+#            try:
+#                wImPixels[x, y] = colors[ind]
+#            except:
+#                print("ind:", ind)
+#            try:
+#                wSImPixels[x, y] = colors[indS]
+#            except:
+#                print("indS:", indS)
+#
+#    if (args.da or args.dw):
+#        wIm.show()
+#        wSIm.show()
+#        print(str(datetime.now()), "Weighted palette image done.")
+#
+#
+#    if (args.sa or args.sw):
+#        wIm.save(savePalBase + "w.jpg", format="JPEG", quality=95)
+#        wSIm.save(savePalBase + "ws.jpg", format="JPEG", quality=95)
+#
+#    wIIm = Image.new("RGB", edges.shape, BACKGROUND)
+#    wIImPixels = wIIm.load()
+#
+#    wSIIm = Image.new("RGB", edges.shape, BACKGROUND)
+#    wSIImPixels = wSIIm.load()
+#
+#    for x in range(edges.shape[0]):
+#        for y in range(edges.shape[1]):
+#            # Actually edge gradient
+#            ed = edges[x, y]
+#            # get the weighted index value
+#            indI = weighted[ed]
+#            indSI = wShift[ed]
+#            # get the palette color for the pixel
+#            wIImPixels[x, y] = anticolors[indI]
+#            wSIImPixels[x, y] = anticolors[indSI]
+#
+#    if (args.da or args.dw):
+#        wIIm.show()
+#        wSIIm.show()
+#        print(str(datetime.now()), "Inverse weighted palette image done.")
+#
+#    if (args.sa or args.sw):
+#        wIIm.save(savePalBase + "wi.jpg", format="JPEG", quality=95)
+#        wSIIm.save(savePalBase + "wsi.jpg", format="JPEG", quality=95)
+#

@@ -10,7 +10,7 @@ from os.path import basename
 from os.path import exists
 
 # Instantiate the command line parser
-parser = argparse.ArgumentParser(description="edges: edge-enhancement and posterization application")
+parser = argparse.ArgumentParser(description="cli_inverter: color plane inverter and swapper")
 
 # Optional argument for filename (defaults to 'test.jpg')
 parser.add_argument('--fn',
@@ -29,11 +29,23 @@ parser.add_argument('--ig', action='store_true', help="invert greens")
 # Optional argument to invert the blue plane
 parser.add_argument('--ib', action='store_true', help="invert blues")
 
+# Optional argument to swap the red and green planes
+parser.add_argument('--srg', action='store_true', help="swap red and green")
+
+# Optional argument to swap the red and blue planes
+parser.add_argument('--srb', action='store_true', help="swap red and blue")
+
+# Optional argument to swap the green and blue planes
+parser.add_argument('--sgb', action='store_true', help="swap green and blue")
+
 args = parser.parse_args()
 print("fn\t", args.fn)
 print("ir\t", args.ir)
 print("ig\t", args.ig)
 print("ib\t", args.ib)
+print("srg\t", args.srg)
+print("srb\t", args.srb)
+print("sgb\t", args.sgb)
 
 # default background for the new image: black and fully transparent
 background = (0, 0, 0, 0)
@@ -105,10 +117,35 @@ iIm = Image.new('RGB', oIm.size, background)
 iPixels = iIm.load()
 
 # do any requested inversions
-for x in range(0, oIm.size[0]):
-    for y in range(0, oIm.size[1]):
+for x in range(oIm.size[0]):
+    for y in range(oIm.size[1]):
         r, g, b = pixels[x, y]
         iPixels[x, y] = (reds[r], greens[g], blues[b])
+
+#do any requested swaps
+# swap red and green planes
+if args.srg:
+    saveBaseStr += '_sgr'
+    for x in range(oIm.size[0]):
+        for y in range(oIm.size[1]):
+            r, g, b = iPixels[x, y]
+            iPixels[x, y] = (g, r, b)
+
+# swap red and blue planes
+if args.srb:
+    saveBaseStr += '_sbr'
+    for x in range(oIm.size[0]):
+        for y in range(oIm.size[1]):
+            r, g, b = iPixels[x, y]
+            iPixels[x, y] = (b, g, r)
+
+# swap green and blue planes
+if args.sgb:
+    saveBaseStr += '_sgb'
+    for x in range(oIm.size[0]):
+        for y in range(oIm.size[1]):
+            r, g, b = iPixels[x, y]
+            iPixels[x, y] = (r, b, g)
 
 iIm.show()
 iIm.save(saveBaseStr + ".jpg", format="JPEG", quality=95)
