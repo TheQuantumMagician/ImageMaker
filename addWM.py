@@ -54,4 +54,4 @@ if fnPath.exists():
     else:
         print(f"The watermark file (%s) does not exist." % args.wm)
 else:
-    print(f"The image file (%s) does not exist." % args.rn)
+    print(f"The image file (%s) does not exist." % args.fn)

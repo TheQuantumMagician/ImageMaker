@@ -8,6 +8,7 @@
 # Based on cli_edges.py
 #
 # 20230509 smb  @TheQuantumMagician - Started
+# 20230601 smb  @TheQuantumMagician - Add edges to reversed palette images.
 #
 
 
@@ -257,7 +258,7 @@ def sobel_hPlane(im, x, y):
 # Calculate the vertical portion of a Sobel gradient
 #     [-1,  0,  1]
 #     [-2,  0,  2]
-#     [-1, -0,  1]
+#     [-1,  0,  1]
 def sobel_vPlane(im, x, y):
     # Apply Sobel mask on a single color plane.
     v = 0
@@ -372,6 +373,75 @@ def applyEdges(im, edges, name, th, display=False, save=False, border=0):
     return(newIm)
 
 
+# Calculate the diagonal 1 portion of a Sobel gradient
+#     [ 2,  1,  0]
+#     [ 1,  0, -1]
+#     [ 0, -1, -2] 
+def sobel_d1Plane(im, x, y):
+    # Apply horizontal Sobel mask on a single color plane.
+    v = 2 * im.getpixel((x - 1, y - 1))[0]
+    v += im.getpixel((x, y - 1))[0]
+    v += im.getpixel((x - 1, y))[0]
+    v -= im.getpixel((x + 1, y))[0]
+    v -= im.getpixel((x, y + 1))[0]
+    v -= 2 * im.getpixel((x + 1, y + 1))[0]
+
+    return(v)
+
+
+# Calculate the diagonal 2 portion of a Sobel gradient
+#     [ 0,  1,  2]
+#     [-1,  0,  1]
+#     [-2, -1,  0]
+def sobel_d2Plane(im, x, y):
+    # Apply Sobel mask on a single color plane.
+    v = im.getpixel((x, y - 1))[0]
+    v += 2 * im.getpixel((x + 1, y - 1))[0]
+    v -= im.getpixel((x - 1, y))[0]
+    v += im.getpixel((x + 1, y))[0]
+    v -= 2 * im.getpixel((x - 1, y + 1))[0]
+    v -= im.getpixel((x, y + 1))[0]
+
+    return(v)
+
+
+# Calculate diagonal Sobel gradient for a pixel
+def dSobel(im, x, y):
+    r1 = sobel_d1Plane(im, x, y)
+    r2 = sobel_d2Plane(im, x, y)
+
+    # Sobel gradient r = sqrt(r1**2 + r2**2)
+    r = int(((r1 * r1) + (r2 * r2))**0.5)
+
+    return(r)
+
+
+# Fill an edges array with the calculated diagonal sobel edge gradient
+def createDSobelEdges(im, edges, border=0):
+
+    for x in range(border, im.size[0] - (2 * border)):
+        for y in range(border, im.size[1] - (2 * border)):
+            edges[x, y] = dSobel(im, x, y)
+
+
+def getDEdges(im, name, bord=0):
+    ePath = Path(name)
+    edges = None
+    if ePath.exists():
+        epFP = open(name, "rb")
+        edges = np.load(epFP)
+        print(str(datetime.now()), "Using saved file:", name)
+    else:
+        # Calculate input image pixel luminosities
+        edges = np.zeros(im.size).astype(int)
+        createDSobelEdges(im, edges, bord)
+        epFP = open(name, "wb")
+        np.save(epFP, edges)
+    epFP.close()
+
+    return(edges)
+
+
 if __name__ == '__main__':
     print("Start now:",  str(datetime.now()))
 
@@ -420,8 +490,11 @@ if __name__ == '__main__':
     # Optional argument to display grayscale smoothed image
     parser.add_argument('--dsgs', action='store_true', help="display smoothed grayscale")
 
-    # Optional argument to display weighted palette eedges image
-    parser.add_argument('--dw', action='store_true', help="display weighted palette")
+    # Optional argument to display weighted palette edges image
+#    parser.add_argument('--dw', action='store_true', help="display weighted palettes")
+
+    # Optional argument to display reversed palette edges image
+    parser.add_argument('--dr', action='store_true', help="display reversed palettes")
 
     # Optional argument to autosave all generated files
     parser.add_argument('--sa', action='store_true', help="autosave all generated images")
@@ -437,8 +510,16 @@ if __name__ == '__main__':
                         action='store_true',
                         help="autosave edged posterized image(s)")
 
+    # Optional argument to autosave the reversed palette image(s)
+    parser.add_argument('--sr', action='store_true', help="autosave posterized image(s)")
+
+    # Optional argument to autosave the reversed and edged image(s)
+    parser.add_argument('--sre',
+                        action='store_true',
+                        help="autosave edged posterized image(s)")
+
     # Optional argument to autosave the weighted palette edges image
-    parser.add_argument('--sw', action='store_true', help="autosave edges image")
+#    parser.add_argument('--sw', action='store_true', help="autosave edges image")
 
     # Optional argument to also create an inverted palette, too
     parser.add_argument('--ci', action='store_true', help="create inverted palette image, too")
@@ -453,6 +534,9 @@ if __name__ == '__main__':
                         default="watermark.png"
                         )
 
+    # Optional argument to replace original image with max saturation version
+    parser.add_argument('--ms', action='store_true', help="create max saturation versions")
+
     # Get the actual values of the command line arguments.
     args = parser.parse_args()
     print("fn\t", args.fn)
@@ -464,13 +548,18 @@ if __name__ == '__main__':
     print("dp\t", args.dp)
     print("ds\t", args.da)
     print("dsgs\t", args.dsgs)
+    print("dr\t", args.dr)
+#    print("dw\t", args.dw)
     print("sa\t", args.sa)
     print("se\t", args.se)
     print("sp\t", args.sp)
     print("spe\t", args.spe)
+    print("sr\t", args.sr)
+#    print("sw\t", args.sw)
     print("ci\t", args.ci)
     print("wm\t", args.wm)
     print("wmfn\t", args.wmfn)
+    print("ms\t", args.ms)
 
     # Create the working palette(s)
     colors = []
@@ -595,8 +684,8 @@ if __name__ == '__main__':
     rpIm = getImage(lums,
                     savePalBase + "rp.jpg",
                     r_colors,
-                    (args.da or args.dp),
-                    (args.sa or args.sp),
+                    (args.da or args.dr),
+                    (args.sa or args.sr),
                     BORDER
                     )
     print(str(datetime.now()), "Reverse posterized image gone.")
@@ -703,8 +792,8 @@ if __name__ == '__main__':
     rcolEdges = edgesImage(normEdges,
                            savePalBase + "rep.jpg",
                            r_colors,
-                           args.da,
-                           (args.sa or args.spe),
+                           (args.da or args.dr),
+                           (args.sa or args.sr),
                            border=BORDER
                            )
 
@@ -714,8 +803,8 @@ if __name__ == '__main__':
         rantiEdges = edgesImage(normEdges,
                                 savePalBase + "repi.jpg",
                                 r_anticolors,
-                                args.da,
-                                (args.sa or args.spe),
+                                (args.da or args.dr),
+                                (args.sa or args.sr),
                                 border=BORDER
                                 )
 
@@ -732,14 +821,15 @@ if __name__ == '__main__':
     print(str(datetime.now()), "Edged smoothed posterized image done.")
 
     if args.ci:
-        sPiIm = applyEdges(sPiIm,
-                           normEdges,
-                           savePalThBase + "espi.jpg",
-                           args.th,
-                           args.da,
-                           (args.sa or args.spee),
-                           border=BORDER
-                           )
+#        sPiIm = applyEdges(sPiIm,
+        esPiIm = applyEdges(sPiIm,
+                            normEdges,
+                            savePalThBase + "espi.jpg",
+                            args.th,
+                            args.da,
+                            (args.sa or args.spe),
+                            border=BORDER
+                            )
 
         print(str(datetime.now()), "Edged smoothed posterized invert image done.")
 
@@ -754,6 +844,142 @@ if __name__ == '__main__':
                       )
 
     print(str(datetime.now()), "Edged smoothed image done.")
+
+# experimental code
+    if args.ms:
+        # Create max saturation image
+        from colorsys import hsv_to_rgb, rgb_to_hsv
+        
+        msIm = Image.new("RGB", im.size, BACKGROUND)
+        msPixels = msIm.load()
+        msOrigImPixels = im.load()
+        for x in range(msIm.size[0]):
+            for y in range(msIm.size[1]):
+                # get original (r,g,b) information
+                r, g, b = msOrigImPixels[x, y]
+                # convert to (h,s,v)
+                h, s, v = rgb_to_hsv(r, g, b)
+                # keep original hue and value, bump saturation to max, get new (r,g,b)
+                nr, ng, nb = hsv_to_rgb(h, 1.0, v)
+                msPixels[x, y] = (int(nr), int(ng), int(nb))
+        msIm.show()
+        msIm.save(saveBase + "ms.jpg", format="JPEG", quality=95)
+        print("Max saturation image done.")
+
+        msEsIm = applyEdges(msIm,
+                          normEdges,
+                          saveThBase + "ms_es.jpg",
+                          args.th,
+                          args.da,
+                          True,
+                          border=BORDER
+                          )
+
+        print(str(datetime.now()), "Edged max saturation image done.")
+# end experimental code
+
+## experimental code -- diagonal edges instead of horizontal/vertical
+#    dEdges = getEdges(sIm, saveBase + "dsobel.npy", BORDER)
+#    dEIm = createDSobelEdges(sIm, dEdges, BORDER)
+#    print(str(datetime.now()), "Diagonal edge gradients calculated.")
+
+#    normDEdges = normalizeEdges(dEdges)
+#    print(str(datetime.now()), "Diagonal gradients normalized.")
+
+#    # NOTE: Add args.th for filname because edgePal created using args.th
+#    dEdgesIm = edgesImage(normDEdges,
+#                          saveThBase + "de.jpg",
+#                          edgePal,
+#                          args.da,
+#                          (args.sa or args.spe),
+#                          border=BORDER
+#                          )
+
+#    print(str(datetime.now()), "Diagonal edges image done.")
+
+#    colDEdges = edgesImage(normDEdges,
+#                           savePalBase + "dep.jpg",
+#                           colors,
+#                           args.da,
+#                           (args.sa or args.spe),
+#                           border=BORDER
+#                           )
+
+#    print(str(datetime.now()), "Posterized diagonal edges image done.")
+
+#    if args.ci:
+#        antiDEdges = edgesImage(normDEdges,
+#                                savePalBase + "depi.jpg",
+#                                anticolors,
+#                                args.da,
+#                                (args.sa or args.spe),
+#                                border=BORDER
+#                                )
+
+#    print(str(datetime.now()), "Posterized invert diagonal edges image done.")
+
+#    rcolDEdges = edgesImage(normDEdges,
+#                            savePalBase + "rdep.jpg",
+#                            r_colors,
+#                            (args.da or args.dr),
+#                            (args.sa or args.sr),
+#                            border=BORDER
+#                            )
+
+#    print(str(datetime.now()), "Reverse posterized diagonal edges image done.")
+
+#    if args.ci:
+#        rantiDEdges = edgesImage(normDEdges,
+#                                 savePalBase + "rdepi.jpg",
+#                                 r_anticolors,
+#                                 (args.da or args.dr),
+#                                 (args.sa or args.sr),
+#                                 border=BORDER
+#                                 )
+
+#    print(str(datetime.now()), "Reverse posterized invert diagonal edges image done.")
+
+#    desPIm = applyEdges(sPIm,
+#                        normDEdges,
+#                        savePalThBase + "desp.jpg",
+#                        args.th,
+#                        args.da,
+#                        (args.sa or args.spe),
+#                        border=BORDER
+#                        )
+
+#    print(str(datetime.now()), "Diagonal edged smoothed posterized image done.")
+
+#    if args.ci:
+#        desPiIm = applyEdges(sPiIm,
+#                             normDEdges,
+#                             savePalThBase + "despi.jpg",
+#                             args.th,
+#                             args.da,
+#                             (args.sa or args.spe),
+#                             border=BORDER
+#                             )
+
+#        print(str(datetime.now()), "Diagonal edged smoothed posterized invert image done.")
+
+##    print("sIm:", str(sIm.size), " normEdges:", normEdges.shape)
+#    desIm = applyEdges(sIm,
+#                       normDEdges,
+#                       saveThBase + "des.jpg",
+#                       args.th,
+#                       args.da,
+#                       True,
+#                       border=BORDER
+#                       )
+
+#    print(str(datetime.now()), "Edged smoothed image done.")
+
+#totalEdgeDifferences = 0
+#for x in range(edges.shape[0]):
+#    for y in range(edges.shape[1]):
+#        totalEdgeDifferences += abs(edges[x, y] - dEdges[x, y])
+
+#print('Edge differences =', totalEdgeDifferences)
 
 #    # Experimental code: trying to create a weighted palettee
 #    

@@ -123,6 +123,14 @@ def fullProcess(colors, name):
     writeColors(Colors, name)
 
 
+def cmapProcess(name):
+    cm = plt.cm.get_cmap(name)
+    colors = palette(cm)
+    colorbar(colors)
+    plot_linearmap(cm)
+#    writeColors(Colors, name)
+
+
 
 # Reddish, Greenish, Purplish
 RdGrPu = ((175, 5, 75), (135, 185, 0), (100, 45, 235))
@@ -293,7 +301,7 @@ GSROYG = ((0, 0, 0),
           (255, 192, 0),
           (255, 255, 0),     # yellow
           (192, 255, 0),
-          (128, 255, 0),     # yellow-green
+          (128, 255, 0),     # chartreuse
           (64, 255, 0),
           (0, 255, 0),       # green
           (0, 0, 0),
@@ -371,10 +379,48 @@ RdBkBl = ((255, 0, 0),
 RdWh = ((255, 0, 0),
       (255, 255, 255),
       )
-fullProcess(RdWh, "RdWh")
+#fullProcess(RdWh, "RdWh")
 
 RdWhBl = ((255, 0, 0),
           (255, 255, 255),
           (0, 0, 255),
           )
-fullProcess(RdWhBl, "RdWhBl")
+#fullProcess(RdWhBl, "RdWhBl")
+
+# Bright Purplish, Bluish, Cyanish
+BPuBlCy = ((174, 0, 255), (72, 157, 255), (130, 205, 255))
+#fullProcess(BPuBlCy, 'BPuBlCy')
+
+# Reddish, Greenish, Purplish
+BRdGrPu = ((255, 10, 110), (185, 255, 0), (110, 50, 255))
+#fullProcess(RdGrPu, 'BRdGrPu')
+
+# Neon Green, Hot Pink, Purplish
+NgHpPu = ((12, 255, 12), (250, 45, 255), (130, 115, 255))
+#fullProcess(NgHpPu, 'BNgHpPu')
+
+DMaMnRdOrYe = ((0, 0, 0),       # black
+               (32, 0, 32),     # magenta
+               (64, 0, 32),    # maroon
+               (96, 0, 0),     # red
+               (128, 64, 0),   # orange
+               (160, 160, 0),   # yellow
+               (192, 192, 192), # white
+               )
+#fullProcess(DMaMnRdOrYe, "DMaMnRdOrYe")
+
+OrWh = ((255, 126, 64), (255, 255, 255))
+fullProcess(OrWh, "OrWh")
+
+BkOr = ((0, 0, 0), (255, 126, 64))
+fullProcess(BkOr, "BkOr")
+
+# Create colorbars and linear maps for some of the builtin cmaps
+# Uncomment the block below to see all default colormaps as colorbars and linear maps
+#import matplotlib as mpl
+#
+#cmap_names = getattr(mpl, 'colormaps')
+#
+#for cmap_name in sorted(cmap_names):
+#    print(cmap_name)
+#    cmapProcess(cmap_name)
