@@ -6,13 +6,16 @@
 # 20230503 smb -- Created
 #
 
+import json
+
 import numpy as np
 import matplotlib.pyplot as plt
+
 from matplotlib import cm
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap as lsc
+
 from PIL import Image
 
-import json
 from datetime import datetime
 
 
@@ -51,7 +54,7 @@ def createCDict(colors):
 
 def custCM(cdict, name):
     # Create a custom colormap from a color dictionary
-    return(LinearSegmentedColormap(name, segmentdata=cdict, N=256))
+    return(lsc(name, segmentdata=cdict, N=256))
 
 
 def palette(cm):
@@ -104,23 +107,73 @@ def writeColors(colors, name):
     cpFP = open(name + '.json', 'wt')
     json.dump(colors, cpFP, indent=4)
     cpFP.close()
+    print('Custom palette', name + '.json', 'written to disk.')
+
+
+# Sort a palette based on the gray value brightness of the colors
+def bSort(palette):
+    # create a version of the input palette sorted by brightness
+    # first, create a dictionary of color keyed by brightness
+    bDict = dict()
+    for color in palette:
+        # calcualte the current color's brightness
+        lum = ((0.3 * color[0]) + (0.59 * color[1]) + (0.11 * color[2]))
+        if lum in bDict:
+            # already have at least one color this bright, add this color to the list
+            tmpList = list()
+            for shade in bDict[lum]:
+                tmpList.append(shade)
+            tmpList.append(color)
+            bDict[lum] = tmpList
+        else:
+            # first color at this brightness, add to dictionary
+            bDict[lum] = [color]
+
+    # new, empty palette
+    bPal = list()
+    # sorting the keys gives us the brightness order
+    bKeys = sorted(bDict.keys())
+    for key in bKeys:
+        # get all the colors at this brightness
+        colors = list(bDict[key])
+        for color in colors:
+            # add color to the new palette
+            bPal.append(color)
+
+    return bPal
+
+
+def customBCM(name, palette):
+
+    # palette in (0..255) range, need in (0.0..1.0) range for lsc.from_list()
+    newPal = list()
+    for color in palette:
+        # convert color from tuple of 3 (0..255) values to tuple of (0.0..1.0) values
+        r = color[0] / 255
+        g = color[1] / 255
+        b = color[2] / 255
+        newPal.append((r, g, b))
+
+    cBCM = lsc.from_list(name, newPal, N=len(newPal))
+
+    return cBCM
 
 
 # Steps:
 #     1. Create a CDict from a color list
 #     2. Create colormap from CDict
 #     3. Create palette from colormap
-#     4. Draw colorbar from colormap
-#     5. Plot colormap lines
-#     6. Write the palette to a JSON file.
+#     4. Write the palette to a JSON file.
+#     5. Draw colorbar from colormap
+#     6. Plot colormap lines
 def fullProcess(colors, name):
     
     Dict = createCDict(colors)
     Cm = custCM(Dict, name)
     Colors = palette(Cm)
+    writeColors(Colors, name)
     colorbar(Colors)
     plot_linearmap(Cm)
-    writeColors(Colors, name)
 
 
 def cmapProcess(name):
@@ -128,8 +181,13 @@ def cmapProcess(name):
     colors = palette(cm)
     colorbar(colors)
     plot_linearmap(cm)
-#    writeColors(Colors, name)
 
+
+def customCmapProcess(name, cm):
+    colors = palette(cm)
+    colorbar(colors)
+    plot_linearmap(cm)
+    writeColors(colors, name)
 
 
 # Reddish, Greenish, Purplish
@@ -410,13 +468,199 @@ DMaMnRdOrYe = ((0, 0, 0),       # black
 #fullProcess(DMaMnRdOrYe, "DMaMnRdOrYe")
 
 OrWh = ((255, 126, 64), (255, 255, 255))
-fullProcess(OrWh, "OrWh")
+#fullProcess(OrWh, "OrWh")
 
 BkOr = ((0, 0, 0), (255, 126, 64))
-fullProcess(BkOr, "BkOr")
+#fullProcess(BkOr, "BkOr")
 
-# Create colorbars and linear maps for some of the builtin cmaps
-# Uncomment the block below to see all default colormaps as colorbars and linear maps
+# Crayola Crayon 8-count Box
+Crayola8 = ((35, 35, 35),       # Black
+            (180, 103, 77),     # Brown
+            (238, 32, 77),      # Red
+            (255, 117, 56),     # Orange
+            (252, 232, 131),    # Yellow
+            (28, 172, 120),     # Green
+            (31, 117, 254),     # Blue
+            (146, 110, 174),    # Violet (Purple)
+            )
+#fullProcess(Crayola8, "Crayola8")
+
+# Crayola Crayon 16-count Box
+Crayola16 = ((35, 35, 35),      # Black
+             (180, 103, 77),    # Brown
+             (192, 68, 143),    # Red Violet
+             (238, 32, 77),     # Red
+             (255, 83, 73),     # Red Orange
+             (255, 117, 56),    # Orange
+             (255, 182, 83),    # Yellow Orange
+             (252, 232, 131),   # Yellow
+             (197, 227, 132),   # Yellow Green
+             (28, 172, 120),    # Green
+             (25, 158, 189),    # Blue Green
+             (31, 117, 254),    # Blue
+             (115, 102, 189),   # Blue Violet
+             (146, 110, 174),   # Violet (Purple)
+             (255, 170, 204),   # Carnation Pink
+             (237, 237, 237),   # White
+            )
+#fullProcess(Crayola16, "Crayola16")
+
+# Crayola Crayon 24-count Box
+Crayola24 = ((35, 35, 35),      # Black
+             (149, 145, 140),   # Gray
+             (180, 103, 77),    # Brown
+             (253, 217, 181),   # Apricot
+             (192, 68, 143),    # Red Violet
+             (247, 83, 148),    # Violet Red
+             (255, 170, 204),   # Carnation Pink
+             (247, 83, 248),    # Scarlet
+             (238, 32, 77),     # Red
+             (255, 83, 73),     # Red Orange
+             (255, 117, 56),    # Orange
+             (255, 182, 83),    # Yellow Orange
+             (252, 232, 131),   # Yellow
+             (240, 232, 145),   # Green Yellow
+             (197, 227, 132),   # Yellow Green
+             (28, 172, 120),    # Green
+             (25, 158, 189),    # Blue Green
+             (29, 172, 214),    # Cerulean
+             (31, 117, 254),    # Blue
+             (46, 80, 144),     # Bluetiful
+             (93, 118, 203),    # Indigo
+             (115, 102, 189),   # Blue Violet
+             (146, 110, 174),   # Violet (Purple)
+             (237, 237, 237),   # White
+            )
+#fullProcess(Crayola24, "Crayola24")
+
+# Crayola Crayon 32-count Box
+Crayola32 = ((35, 35, 35),      # Black                   8
+             (149, 145, 140),   # Gray                   24
+             (180, 103, 77),    # Brown                   8
+             (188, 93, 88),     # Chestnut               32
+             (250, 167, 108),   # Tan                    32
+             (253, 188, 180),   # Melon                  32
+             (253, 217, 181),   # Apricot                24
+             (255, 207, 171),   # Peach                  32
+             (192, 68, 143),    # Red Violet             16
+             (247, 83, 148),    # Violet Red             24
+             (255, 170, 204),   # Carnation Pink         16
+             (247, 83, 248),    # Scarlet                24
+             (238, 32, 77),     # Red                     8
+             (255, 83, 73),     # Red Orange             16
+             (255, 117, 56),    # Orange                  8
+             (255, 182, 83),    # Yellow Orange          16
+             (252, 232, 131),   # Yellow                  8
+             (240, 232, 145),   # Green Yellow           24
+             (197, 227, 132),   # Yellow Green           16
+             (28, 172, 120),    # Green                   8
+             (25, 158, 189),    # Blue Green             16
+             (29, 172, 214),    # Cerulean               24
+             (128, 218, 235),   # Sky Blue               32
+             (31, 117, 254),    # Blue                    8
+             (46, 80, 144),     # Bluetiful              24
+             (93, 118, 203),    # Indigo                 24
+             (115, 102, 189),   # Blue Violet            16
+             (146, 110, 174),   # Violet (Purple)         8
+             (176, 183, 198),   # Cadet Blue             32
+             (205, 164, 222),   # Wisteria               32
+             (219, 215, 210),   # Timberwolf             32
+             (237, 237, 237),   # White                  16
+            )
+#fullProcess(Crayola32, "Crayola32")
+
+# Crayola Crayon 48-count Box
+Crayola48 = ((35, 35, 35),      # Black                       8
+             (149, 145, 140),   # Gray                       24
+             (165, 105, 79),    # Sepia                      48
+             (180, 103, 77),    # Brown                       8
+             (188, 93, 88),     # Chestnut                   32
+             (186, 184, 108),   # Olive Green                48
+             (205, 74, 74),     # Mahogany                   48
+             (214, 138, 89),    # Raw Sienna                 48
+             (234, 126, 93),    # Burnt Sienna               48
+             (222, 179, 136),   # Tumbleweed                 48
+             (250, 167, 108),   # Tan                        32
+             (236, 234, 190),   # Spring Green               48
+             (239, 152, 170),   # Mauvelous                  48
+             (255, 155, 170),   # Salmon                     48
+             (252, 180, 213),   # Lavender                   48
+             (253, 188, 180),   # Melon                      32
+             (253, 217, 181),   # Apricot                    24
+             (255, 189, 136),   # Macaroni and Cheese        48
+             (255, 207, 171),   # Peach                      32
+             (255, 217, 117),   # Goldenrod                  48
+             (192, 68, 143),    # Red Violet                 16
+             (247, 83, 148),    # Violet Red                 24
+             (255, 170, 204),   # Carnation Pink             16
+             (247, 83, 248),    # Scarlet                    24
+             (238, 32, 77),     # Red                         8
+             (255, 83, 73),     # Red Orange                 16
+             (255, 117, 56),    # Orange                      8
+             (159, 226, 191),   # Sea Green                  48
+             (168, 228, 160),   # Granny Smith Apple         48
+             (255, 182, 83),    # Yellow Orange              16
+             (252, 232, 131),   # Yellow                      8
+             (240, 232, 145),   # Green Yellow               24
+             (197, 227, 132),   # Yellow Green               16
+             (28, 172, 120),    # Green                       8
+             (25, 158, 189),    # Blue Green                 16
+             (29, 172, 214),    # Cerulean                   24
+             (128, 218, 235),   # Sky Blue                   32
+             (154, 206, 235),   # Cornflower                 48
+             (31, 117, 254),    # Blue                        8
+             (46, 80, 144),     # Bluetiful                  24
+             (93, 118, 203),    # Indigo                     24
+             (115, 102, 189),   # Blue Violet                16
+             (146, 110, 174),   # Violet (Purple)             8
+             (157, 129, 186),   # Purple Mountains' Majesty  48
+             (176, 183, 198),   # Cadet Blue                 32
+             (205, 164, 222),   # Wisteria                   32
+             (219, 215, 210),   # Timberwolf                 32
+             (237, 237, 237),   # White                      16
+            )
+fullProcess(Crayola48, "Crayola48")
+
+bC8 = bSort(Crayola8)
+fullProcess(bC8, "bC8")
+
+bC16 = bSort(Crayola16)
+#fullProcess(bC16, "bC16")
+
+bC24 = bSort(Crayola24)
+#fullProcess(bC24, "bC24")
+
+bC32 = bSort(Crayola32)
+#fullProcess(bC32, "bC32")
+
+bC48 = bSort(Crayola48)
+fullProcess(bC48, "bC48")
+
+# sort by brightness, and then banded, palettes
+cmBC8 = customBCM("cmBC8", bC8)
+customCmapProcess("cmBC8", cmBC8)
+
+cmBC16 = customBCM("cmBC16", bC16)
+#customCmapProcess("cmBC16", cmBC16)
+
+cmBC24 = customBCM("cmBC24", bC24)
+#customCmapProcess("cmBC24", cmBC24)
+
+cmBC32 = customBCM("cmBC32", bC32)
+#customCmapProcess("cmBC32", cmBC32)
+
+cmBC48 = customBCM("cmBC48", bC48)
+customCmapProcess("cmBC48", cmBC48)
+
+# Create to compare calculated brightness vs sorting on (g, r, b)
+SBC48_GRB = sorted(Crayola48, key=lambda x: (x[1], x[0], x[2]))
+fullProcess(SBC48_GRB, "SBC48_GRB")
+
+cmSBC48_GRB = customBCM("cmSBC48_GRB", SBC48_GRB)
+customCmapProcess("cmSBC48_GRB", cmSBC48_GRB)
+
+# Create colorbars and linear maps from all of the builtin cmaps
+# Uncomment the 7 lines below to see all built-in colormaps as colorbars and linear maps
 #import matplotlib as mpl
 #
 #cmap_names = getattr(mpl, 'colormaps')
