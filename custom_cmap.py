@@ -85,6 +85,25 @@ def colorbar(colors):
     cbIm.show()
 
 
+def plot_linearmap_offline(cm):
+    # plot a line map of a colormap in the browser
+    from plotly import offline
+    from plotly.graph_objs import Layout
+    # get the rgb data from the colormap as a 256 length list
+    rgba = cm(np.linspace(0, 1, 256))
+    x_values = np.arange(256)/256
+
+    traces = []
+    traces.append(dict(x = x_values, y = rgba[:, 0], name='red', marker=dict(color='red'), line=dict(width=4)))    
+    traces.append(dict(x = x_values, y = rgba[:, 1], name='green', marker=dict(color='green'), line=dict(width=4)))    
+    traces.append(dict(x = x_values, y = rgba[:, 2], name='blue', marker=dict(color='blue'), line=dict(width=4)))    
+
+    x_axis_config = {'title': 'index'}
+    y_axis_config = {'title': 'RGB'}
+    my_layout = Layout(title=cm.name, xaxis=x_axis_config, yaxis=y_axis_config)
+    offline.plot({'data': traces, 'layout': my_layout}, filename=cm.name + 'linearmap.html')
+
+
 def plot_linearmap(cm):
     # plot a line map of a colormap
     rgba = cm(np.linspace(0, 1, 256))
@@ -112,35 +131,9 @@ def writeColors(colors, name):
 
 # Sort a palette based on the gray value brightness of the colors
 def bSort(palette):
-    # create a version of the input palette sorted by brightness
-    # first, create a dictionary of color keyed by brightness
-    bDict = dict()
-    for color in palette:
-        # calcualte the current color's brightness
-        lum = ((0.3 * color[0]) + (0.59 * color[1]) + (0.11 * color[2]))
-        if lum in bDict:
-            # already have at least one color this bright, add this color to the list
-            tmpList = list()
-            for shade in bDict[lum]:
-                tmpList.append(shade)
-            tmpList.append(color)
-            bDict[lum] = tmpList
-        else:
-            # first color at this brightness, add to dictionary
-            bDict[lum] = [color]
-
-    # new, empty palette
-    bPal = list()
-    # sorting the keys gives us the brightness order
-    bKeys = sorted(bDict.keys())
-    for key in bKeys:
-        # get all the colors at this brightness
-        colors = list(bDict[key])
-        for color in colors:
-            # add color to the new palette
-            bPal.append(color)
-
-    return bPal
+    # Use a lambda to do the sorting
+    lbPal = sorted(palette, key=lambda x: ((0.59 * x[1]) + (0.3 * x[0]) + (0.11 * x[2])))
+    return lbPal
 
 
 def customBCM(name, palette):
@@ -169,74 +162,95 @@ def customBCM(name, palette):
 def fullProcess(colors, name):
     
     Dict = createCDict(colors)
-    Cm = custCM(Dict, name)
-    Colors = palette(Cm)
+    cmNew = custCM(Dict, name)
+    Colors = palette(cmNew)
     writeColors(Colors, name)
     colorbar(Colors)
-    plot_linearmap(Cm)
+#    plot_linearmap(cmNew)
+    plot_linearmap_offline(cmNew)
 
 
 def cmapProcess(name):
-    cm = plt.cm.get_cmap(name)
-    colors = palette(cm)
+    cmNew = plt.cm.get_cmap(name)
+    colors = palette(cmNew)
     colorbar(colors)
-    plot_linearmap(cm)
+#    plot_linearmap(cmNew)
+    plot_linearmap_offline(cmNew)
 
 
-def customCmapProcess(name, cm):
-    colors = palette(cm)
+def customCmapProcess(name, cmNew):
+    colors = palette(cmNew)
     colorbar(colors)
-    plot_linearmap(cm)
+#    plot_linearmap(cmNew)
+    plot_linearmap_offline(cmNew)
     writeColors(colors, name)
+
+
+def _fPAB(palette, name):
+    # create both fade and banded transition palettes, display colorbar and linearmap
+    cmName = 'cm' + name
+    fullProcess(palette, name)
+    newCm = customBCM(cmName, palette)
+    customCmapProcess(cmName, newCm)
+    
+
+def fullProcessAndBanded(palette, name, bsort=False):
+    # create both fade and banded transtions, and possible brightness sorted version
+    _fPAB(palette, name)
+    if bsort:
+        bsPalette = bSort(palette)
+        bsName = 'b' + name
+        _fPAB(bsPalette, bsName)
+
 
 
 # Reddish, Greenish, Purplish
 RdGrPu = ((175, 5, 75), (135, 185, 0), (100, 45, 235))
-#fullProcess(RdGrPu, 'RdGrPu')
+#fullProcessAndBanded(RdGrPu, 'RdGrPu', True)
 
 # Neon Green, Hot Pink, Purplish
 NgHpPu = ((12, 255, 12), (215, 37, 222), (98, 88, 196))
-#fullProcess(NgHpPu, 'NgHpPu')
+#fullProcessAndBanded(NgHpPu, 'NgHpPu', True)
 
 # Blue, Orange, Green
 BlOrGr = ((5, 10, 100), (250, 115, 10), (120, 205, 40))
-#fullProcess(BlOrGr, 'BlOrGr')
+#fullProcessAndBanded(BlOrGr, 'BlOrGr', True)
 
 # Purplish, Bluish, Cyanish
 PuBlCy = ((75, 0, 110), (55, 120, 195), (130, 205, 255))
-#fullProcess(PuBlCy, 'PuBlCy')
+#fullProcessAndBanded(PuBlCy, 'PuBlCy', True)
 
 ## Purplish, Bluish, Cyanish Extended
 PuBlCyE = ((75, 0, 110), (55, 120, 195), (130, 205, 255), (130, 205, 255))
-#fullProcess(PuBlCy, 'PuBlCyE')
+#fullProcessAndBanded(PuBlCy, 'PuBlCyE', True)
 
 # Reddish, Orangish, Brown
 RdOrBr = ((230, 0, 0), (250, 115, 0), (140, 50, 5))
-#fullProcess(RdOrBr, 'RdOrBr')
+#fullProcessAndBanded(RdOrBr, 'RdOrBr', True)
 
 # Reddish, Orangish, Brown Extended
 RdOrBrE = ((230, 0, 0), (250, 115, 0), (140, 50, 5), (140, 50, 5))
-#fullProcess(RdOrBr, 'RdOrBrE')
+#fullProcessAndBanded(RdOrBr, 'RdOrBrE', True)
 
 # Reddish, Orangish, Brown
 RdOrBl = ((230, 0, 0), (250, 115, 0), (5, 5, 230))
-#fullProcess(RdOrBr, 'RdOrBl')
+#fullProcessAndBanded(RdOrBr, 'RdOrBl', True)
 
 # Slate, Hot Pink, Bluish
 SlHpBl = ((35, 75, 100), (240, 15, 220), (5, 5, 230))
-#fullProcess(SlHpBl, 'SlHpBl')
+#fullProcessAndBanded(SlHpBl, 'SlHpBl', True)
 
 # Pale Green, Charcoal, Pink
 PgChPi = ((5, 160, 75), (90, 105, 110), (225, 80, 200))
-#fullProcess(PgChPi, 'PgChPi')
+#fullProcessAndBanded(PgChPi, 'PgChPi', True)
 
 # Orangish, Reddish, Purplish
 OrRdPu = ((225, 120, 5), (190, 65, 65), (95, 10, 235))
-#fullProcess(OrRdPu, 'OrRdPu')
+#fullProcessAndBanded(OrRdPu, 'OrRdPu', True)
 
 # cyclical RGB
 CR = ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 0, 0))
-#fullProcess(CR, 'CR')
+#fullProcessAndBanded(CR, 'CR', True)
 
 # RYGCBMR -- Cyclical Rainbow
 R = ((255, 0, 0),       # red
@@ -247,7 +261,7 @@ R = ((255, 0, 0),       # red
      (255, 0, 255),     # magenta
      (255, 0, 0),       # red
      )
-#fullProcess(R, 'R')
+#fullProcessAndBanded(R, 'R', True)
 
 # RYGCBMMBCGYR rainbow
 IL = ((255, 0, 0),      # red
@@ -263,24 +277,24 @@ IL = ((255, 0, 0),      # red
       (255, 255, 0),    # yellow
       (255, 0, 0),      # red
       )
-#fullProcess(IL, 'IL')
+#fullProcessAndBanded(IL, 'IL', True)
 
 PgChPiRdOrBl = list()
 PgChPiRdOrBl.extend(PgChPi)
 PgChPiRdOrBl.extend(RdOrBl)
-#fullProcess(PgChPiRdOrBl, "PgChPiRdOrBl")
+#fullProcessAndBanded(PgChPiRdOrBl, 'PgChPiRdOrBl', True)
 
 # Gold, Magenta, Blue
 GoMaBl = ((245, 195, 5), (153, 0, 250), (5, 15, 205))
-#fullProcess(GoMaBl, "GoMaBl")
+#fullProcessAndBanded(GoMaBl, 'GoMaBl', True)
 
 # Slate, Gray, Light Blue
 SlGyLb = ((100, 125, 145), (200, 205, 200), (150, 210, 255))
-#fullProcess(SlGyLb, "SlGyLb")
+#fullProcessAndBanded(SlGyLb, 'SlGyLb', True)
 
 # Slate, Gray, Light Blue Extended
 SlGyLbE = ((100, 125, 145), (200, 205, 200), (150, 210, 255), (150, 210, 255))
-#fullProcess(SlGyLbE, "SlGyLbE")
+#fullProcessAndBanded(SlGyLbE, 'SlGyLbE', True)
 
 # Banded Grayscale
 BGS = ((0, 0, 0),
@@ -294,7 +308,7 @@ BGS = ((0, 0, 0),
        (255, 255, 255),
        (255, 255, 255),
        )
-#fullProcess(BGS, "BGS")
+#fullProcessAndBanded(BGS, 'BGS', True)
 
 # Banded Grayscale and Rainbow
 BGSR = ((0, 0, 0),
@@ -315,7 +329,7 @@ BGSR = ((0, 0, 0),
        (255, 0, 255),     # magenta
        (255, 0, 0),       # red
        )
-#fullProcess(BGSR, "BGSR")
+#fullProcessAndBanded(BGSR, 'BGSR', True)
 
 # Grayscale and Rainbow
 GSR = ((0, 0, 0),
@@ -341,7 +355,7 @@ GSR = ((0, 0, 0),
        (255, 0, 128),     # maroon
        (255, 0, 0),       # red
        )
-#fullProcess(GSR, "GSR")
+#fullProcessAndBanded(GSR, 'GSR', True)
 
 # Grayscale and ROYG
 GSROYG = ((0, 0, 0),
@@ -364,14 +378,14 @@ GSROYG = ((0, 0, 0),
           (0, 255, 0),       # green
           (0, 0, 0),
           )
-#fullProcess(GSROYG, "GSROYG")
+#fullProcessAndBanded(GSROYG, 'GSROYG', True)
 
 # Yellow, Red, Orange
 YRO = ((195, 185, 10),
        (155, 5, 0),
        (255, 170, 45),
        )
-#fullProcess(YRO, "YRO")
+#fullProcessAndBanded(YRO, 'YRO', True)
 
 CBR = ((255, 0, 0),       # red
        (255, 0, 0),       # red
@@ -393,7 +407,7 @@ CBR = ((255, 0, 0),       # red
        (255, 0, 128),     # maroon
        (255, 0, 0),       # red
        )
-#fullProcess(CBR, "CBR")
+#fullProcessAndBanded(CBR, 'CBR', True)
 
 CBrOrYeRd = ((192, 96, 48),
             (192, 96, 0),
@@ -401,12 +415,12 @@ CBrOrYeRd = ((192, 96, 48),
             (192, 0, 0),
             (192, 96, 48),
             )
-#fullProcess(CBrOrYeRd, "CBrOrYeRd")
+#fullProcessAndBanded(CBrOrYeRd, 'CBrOrYeRd', True)
 
 RdBk = ((255, 0, 0),
       (0, 0, 0),
       )
-#fullProcess(RdBk, "RdBk")
+#fullProcessAndBanded(RdBk, 'RdBk', True)
 
 BkRdBkGrBkBlBk = ((0, 0, 0),
                 (255, 0, 0),
@@ -416,7 +430,7 @@ BkRdBkGrBkBlBk = ((0, 0, 0),
                 (0, 0, 255),
                 (0, 0, 0),
                 )
-#fullProcess(BkRdBkGrBkBlBk, "BkRdBkGrBkBlBk")
+#fullProcessAndBanded(BkRdBkGrBkBlBk, 'BkRdBkGrBkBlBk', True)
 
 BkRdBkOrBkYeBk = ((0, 0, 0),
                  (255, 0, 0),
@@ -426,36 +440,36 @@ BkRdBkOrBkYeBk = ((0, 0, 0),
                  (255, 255, 0),
                  (0, 0, 0),
                  )
-#fullProcess(BkRdBkOrBkYeBk, "BkRdBkOrBkYeBk")
+#fullProcessAndBanded(BkRdBkOrBkYeBk, 'BkRdBkOrBkYeBk', True)
 
 RdBkBl = ((255, 0, 0),
           (0, 0, 0),
           (0, 0, 255),
           )
-#fullProcess(RdBkBl, "RdBkBl")
+#fullProcessAndBanded(RdBkBl, 'RdBkBl', True)
 
 RdWh = ((255, 0, 0),
       (255, 255, 255),
       )
-#fullProcess(RdWh, "RdWh")
+#fullProcessAndBanded(RdWh, 'RdWh', True)
 
 RdWhBl = ((255, 0, 0),
           (255, 255, 255),
           (0, 0, 255),
           )
-#fullProcess(RdWhBl, "RdWhBl")
+#fullProcessAndBanded(RdWhBl, 'RdWhBl', True)
 
 # Bright Purplish, Bluish, Cyanish
 BPuBlCy = ((174, 0, 255), (72, 157, 255), (130, 205, 255))
-#fullProcess(BPuBlCy, 'BPuBlCy')
+#fullProcessAndBanded(BPuBlCy, 'BPuBlCy', True)
 
 # Reddish, Greenish, Purplish
 BRdGrPu = ((255, 10, 110), (185, 255, 0), (110, 50, 255))
-#fullProcess(RdGrPu, 'BRdGrPu')
+#fullProcessAndBanded(RdGrPu, 'BRdGrPu', True)
 
 # Neon Green, Hot Pink, Purplish
 NgHpPu = ((12, 255, 12), (250, 45, 255), (130, 115, 255))
-#fullProcess(NgHpPu, 'BNgHpPu')
+#fullProcessAndBanded(NgHpPu, 'BNgHpPu', True)
 
 DMaMnRdOrYe = ((0, 0, 0),       # black
                (32, 0, 32),     # magenta
@@ -465,13 +479,13 @@ DMaMnRdOrYe = ((0, 0, 0),       # black
                (160, 160, 0),   # yellow
                (192, 192, 192), # white
                )
-#fullProcess(DMaMnRdOrYe, "DMaMnRdOrYe")
+#fullProcessAndBanded(DMaMnRdOrYe, 'DMaMnRdOrYe', True)
 
 OrWh = ((255, 126, 64), (255, 255, 255))
-#fullProcess(OrWh, "OrWh")
+#fullProcessAndBanded(OrWh, 'OrWh', True)
 
 BkOr = ((0, 0, 0), (255, 126, 64))
-#fullProcess(BkOr, "BkOr")
+#fullProcessAndBanded(BkOr, 'BkOr', True)
 
 # Crayola Crayon 8-count Box
 Crayola8 = ((35, 35, 35),       # Black
@@ -483,7 +497,7 @@ Crayola8 = ((35, 35, 35),       # Black
             (31, 117, 254),     # Blue
             (146, 110, 174),    # Violet (Purple)
             )
-#fullProcess(Crayola8, "Crayola8")
+#fullProcessAndBanded(Crayola8, 'Crayola8', True)
 
 # Crayola Crayon 16-count Box
 Crayola16 = ((35, 35, 35),      # Black
@@ -503,7 +517,7 @@ Crayola16 = ((35, 35, 35),      # Black
              (255, 170, 204),   # Carnation Pink
              (237, 237, 237),   # White
             )
-#fullProcess(Crayola16, "Crayola16")
+#fullProcessAndBanded(Crayola16, 'Crayola16', True)
 
 # Crayola Crayon 24-count Box
 Crayola24 = ((35, 35, 35),      # Black
@@ -531,7 +545,7 @@ Crayola24 = ((35, 35, 35),      # Black
              (146, 110, 174),   # Violet (Purple)
              (237, 237, 237),   # White
             )
-#fullProcess(Crayola24, "Crayola24")
+#fullProcessAndBanded(Crayola24,'Crayola24', True)
 
 # Crayola Crayon 32-count Box
 Crayola32 = ((35, 35, 35),      # Black                   8
@@ -567,7 +581,7 @@ Crayola32 = ((35, 35, 35),      # Black                   8
              (219, 215, 210),   # Timberwolf             32
              (237, 237, 237),   # White                  16
             )
-#fullProcess(Crayola32, "Crayola32")
+#fullProcessAndBanded(Crayola32, 'Crayola32', True)
 
 # Crayola Crayon 48-count Box
 Crayola48 = ((35, 35, 35),      # Black                       8
@@ -619,47 +633,301 @@ Crayola48 = ((35, 35, 35),      # Black                       8
              (219, 215, 210),   # Timberwolf                 32
              (237, 237, 237),   # White                      16
             )
-fullProcess(Crayola48, "Crayola48")
+#fullProcessAndBanded(Crayola48, 'Crayola48', True)
 
-bC8 = bSort(Crayola8)
-fullProcess(bC8, "bC8")
+# Crayola Crayon 64-count Box
+Crayola64 = ((35, 35, 35),      # Black                       8
+             (149, 145, 140),   # Gray                       24
+             (205, 197, 194),	# Silver                     64
+             (165, 105, 79),    # Sepia                      48
+             (180, 103, 77),    # Brown                       8
+             (188, 93, 88),     # Chestnut                   32
+             (214, 138, 89),    # Raw Sienna                 48
+             (234, 126, 93),    # Burnt Sienna               48
+             (222, 179, 136),   # Tumbleweed                 48
+             (231, 198, 151),	# Gold                       64
+             (203, 65, 84),	# Brick Red                  64
+             (205, 74, 74),     # Mahogany                   48
+             (230, 168, 215),	# Orchid                     64
+             (246, 100, 175),	# Magenta                    64
+             (253, 124, 110),	# Bittersweet                64
+             (252, 137, 172),	# Tickle Me Pink             64
+             (250, 167, 108),   # Tan                        32
+             (135, 169, 107),	# Asparagus                  64
+             (109, 174, 129),	# Forest Green               64
+             (186, 184, 108),   # Olive Green                48
+             (197, 208, 230),	# Periwinkle                 64
+             (236, 234, 190),   # Spring Green               48
+             (239, 152, 170),   # Mauvelous                  48
+             (255, 67, 164),	# Wild Strawberry            64
+             (255, 127, 73),	# Burnt Orange               64
+             (255, 155, 170),   # Salmon                     48
+             (252, 180, 213),   # Lavender                   48
+             (253, 188, 180),   # Melon                      32
+             (253, 217, 181),   # Apricot                    24
+             (255, 189, 136),   # Macaroni and Cheese        48
+             (255, 207, 171),   # Peach                      32
+             (255, 217, 117),   # Goldenrod                  48
+             (192, 68, 143),    # Red Violet                 16
+             (247, 83, 148),    # Violet Red                 24
+             (255, 170, 204),   # Carnation Pink             16
+             (247, 83, 248),    # Scarlet                    24
+             (238, 32, 77),     # Red                         8
+             (255, 83, 73),     # Red Orange                 16
+             (255, 117, 56),    # Orange                      8
+             (159, 226, 191),   # Sea Green                  48
+             (168, 228, 160),   # Granny Smith Apple         48
+             (255, 182, 83),    # Yellow Orange              16
+             (252, 232, 131),   # Yellow                      8
+             (240, 232, 145),   # Green Yellow               24
+             (197, 227, 132),   # Yellow Green               16
+             (28, 172, 120),    # Green                       8
+             (25, 158, 189),    # Blue Green                 16
+             (28, 169, 201),	# Pacific Blue               64
+             (31, 206, 203),	# Robin's Egg Blue           64
+             (29, 172, 214),    # Cerulean                   24
+             (128, 218, 235),   # Sky Blue                   32
+             (154, 206, 235),   # Cornflower                 48
+             (119, 221, 231),	# Turquoise Blue             64
+             (31, 117, 254),    # Blue                        8
+             (46, 80, 144),     # Bluetiful                  24
+             (93, 118, 203),    # Indigo                     24
+             (115, 102, 189),   # Blue Violet                16
+             (146, 110, 174),   # Violet (Purple)             8
+             (157, 129, 186),   # Purple Mountains' Majesty  48
+             (176, 183, 198),   # Cadet Blue                 32
+             (205, 164, 222),   # Wisteria                   32
+             (142, 69, 133),	# Plum                       64
+             (219, 215, 210),   # Timberwolf                 32
+             (237, 237, 237),   # White                      16
+            )
+#fullProcessAndBanded(Crayola64, 'Crayola64', True)
 
-bC16 = bSort(Crayola16)
-#fullProcess(bC16, "bC16")
+# Crayola Crayon 96-count Box
+Crayola96 = ((35, 35, 35),	# Black
+             (26, 72, 118),	# Midnight Blue
+             (46, 80, 144),	# Bluetiful
+             (23, 128, 109),	# Tropical Rain Forest
+             (21, 128, 120),	# Pine Green
+             (142, 69, 133),	# Plum
+             (43, 108, 196),	# Denim
+             (238, 32, 77),	# Red
+             (25, 116, 210),	# Navy Blue
+             (227, 37, 107),	# Razzmatazz
+             (120, 81, 169),	# Royal Purple
+             (200, 56, 90),	# Maroon
+             (242, 40, 71),	# Scarlet
+             (202, 55, 103),	# Jazzberry Jam
+             (31, 117, 254),	# Blue
+             (203, 65, 84),	# Brick Red
+             (205, 74, 74),	# Mahogany
+             (192, 68, 143),	# Red Violet
+             (115, 102, 189),	# Blue Violet
+             (255, 29, 206),	# Hot Magenta
+             (255, 29, 206),	# Purple Pizza
+             (93, 118, 203),	# Indigo
+             (165, 105, 79),	# Sepia
+             (188, 93, 88),	# Chestnut
+             (25, 158, 189),	# Blue Green
+             (221, 68, 146),	# Cerise
+             (28, 172, 120),	# Green
+             (180, 103, 77),	# Brown
+             (146, 110, 174),	# Violet (Purple)
+             (28, 169, 201),	# Pacific Blue
+             (255, 73, 107),	# Radical Red
+             (255, 83, 73),	# Red Orange
+             (29, 172, 214),	# Cerulean
+             (255, 67, 164),	# Wild Strawberry
+             (59, 176, 143),	# Jungle Green
+             (195, 100, 197),	# Fuchsia
+             (247, 83, 148),	# Violet Red
+             (255, 72, 208),	# Razzle Dazzle Rose
+             (157, 129, 186),	# Purple Mountains' Majesty
+             (149, 145, 140),	# Gray
+             (255, 110, 74),	# Outrageous Orange
+             (109, 174, 129),	# Forest Green
+             (255, 117, 56),	# Orange
+             (135, 169, 107),	# Asparagus
+             (246, 100, 175),	# Magenta
+             (31, 206, 203),	# Robin's Egg Blue
+             (252, 108, 133),	# Wild Watermelon
+             (234, 126, 93),	# Burnt Sienna
+             (214, 138, 89),	# Raw Sienna
+             (29, 249, 20),	# Electric Lime
+             (255, 127, 73),	# Burnt Orange
+             (69, 206, 162),	# Shamrock
+             (255, 130, 67),	# Mango Tango
+             (253, 124, 110),	# Bittersweet
+             (221, 148, 117),	# Copper
+             (162, 173, 208),	# Wild Blue Yonder
+             (252, 137, 172),	# Tickle Me Pink
+             (186, 184, 108),	# Olive Green
+             (251, 126, 253),	# Shocking Pink
+             (255, 163, 67),	# Neon Carrot
+             (239, 152, 170),	# Mauvelous
+             (222, 170, 136),	# Tumbleweed
+             (176, 183, 198),	# Cadet Blue
+             (205, 164, 222),	# Wisteria
+             (250, 167, 108),	# Tan
+             (255, 160, 137),	# Vivid Tangerine
+             (255, 164, 116),	# Atomic Tangerine
+             (255, 155, 170),	# Salmon
+             (119, 221, 231),	# Turquoise Blue
+             (230, 168, 215),	# Orchid
+             (128, 218, 235),	# Sky Blue
+             (255, 182, 83),	# Yellow Orange
+             (154, 206, 235),	# Cornflower
+             (205, 197, 194),	# Silver
+             (255, 170, 204),	# Carnation Pink
+             (118, 255, 122),	# Screamin Green
+             (159, 226, 191),	# Sea Green
+             (168, 228, 160),	# Granny Smith Apple
+             (231, 198, 151),	# Gold
+             (178, 236, 93),	# Inchworm
+             (255, 189, 136),	# Macaroni and Cheese
+             (252, 180, 213),	# Lavender
+             (255, 207, 72),	# Sunglow
+             (253, 188, 180),	# Melon
+             (197, 208, 230),	# Periwinkle
+             (197, 227, 132),	# Yellow Green
+             (219, 215, 210),	# Timberwolf
+             (255, 217, 117),	# Goldenrod
+             (255, 207, 171),	# Peach
+             (253, 217, 181),	# Apricot
+             (240, 232, 145),	# Green Yellow
+             (252, 232, 131),	# Yellow
+             (236, 234, 190),	# Spring Green
+             (237, 237, 237),	# White
+             (253, 252, 116),	# Laser Lemon
+             (253, 252, 116),	# Unmellow Yellow
+             )
+fullProcessAndBanded(Crayola96, 'Crayola96')
 
-bC24 = bSort(Crayola24)
-#fullProcess(bC24, "bC24")
-
-bC32 = bSort(Crayola32)
-#fullProcess(bC32, "bC32")
-
-bC48 = bSort(Crayola48)
-fullProcess(bC48, "bC48")
-
-# sort by brightness, and then banded, palettes
-cmBC8 = customBCM("cmBC8", bC8)
-customCmapProcess("cmBC8", cmBC8)
-
-cmBC16 = customBCM("cmBC16", bC16)
-#customCmapProcess("cmBC16", cmBC16)
-
-cmBC24 = customBCM("cmBC24", bC24)
-#customCmapProcess("cmBC24", cmBC24)
-
-cmBC32 = customBCM("cmBC32", bC32)
-#customCmapProcess("cmBC32", cmBC32)
-
-cmBC48 = customBCM("cmBC48", bC48)
-customCmapProcess("cmBC48", cmBC48)
-
-# Create to compare calculated brightness vs sorting on (g, r, b)
-SBC48_GRB = sorted(Crayola48, key=lambda x: (x[1], x[0], x[2]))
-fullProcess(SBC48_GRB, "SBC48_GRB")
-
-cmSBC48_GRB = customBCM("cmSBC48_GRB", SBC48_GRB)
-customCmapProcess("cmSBC48_GRB", cmSBC48_GRB)
+Crayola120 = ((35, 35, 35),	# Black
+              (26, 72, 118),	# Midnight Blue
+              (65, 74, 76),	# Outer Space
+              (46, 80, 144),	# Bluetiful
+              (110, 81, 96),	# Eggplant
+              (23, 128, 109),	# Tropical Rain Forest
+              (21, 128, 120),	# Pine Green
+              (116, 66, 200),	# Purple Heart
+              (142, 69, 133),	# Plum
+              (43, 108, 196),	# Denim
+              (238, 32, 77),	# Red
+              (25, 116, 210),	# Navy Blue
+              (227, 37, 107),	# Razzmatazz
+              (120, 81, 169),	# Royal Purple
+              (200, 56, 90),	# Maroon
+              (242, 40, 71),	# Scarlet
+              (202, 55, 103),	# Jazzberry Jam
+              (31, 117, 254),	# Blue
+              (143, 80, 157),	# Vivid Violet
+              (203, 65, 84),	# Brick Red
+              (205, 74, 74),	# Mahogany
+              (192, 68, 143),	# Red Violet
+              (115, 102, 189),	# Blue Violet
+              (255, 29, 206),	# Hot Magenta
+              (255, 29, 206),	# Purple Pizza
+              (93, 118, 203),	# Indigo
+              (165, 105, 79),	# Sepia
+              (188, 93, 88),	# Chestnut
+              (25, 158, 189),	# Blue Green
+              (221, 68, 146),	# Cerise
+              (138, 121, 93),	# Shadow
+              (28, 172, 120),	# Green
+              (180, 103, 77),	# Brown
+              (146, 110, 174),	# Violet (Purple)
+              (28, 169, 201),	# Pacific Blue
+              (255, 73, 107),	# Radical Red
+              (204, 102, 102),	# Fuzzy Wuzzy
+              (255, 83, 73),	# Red Orange
+              (29, 172, 214),	# Cerulean
+              (255, 67, 164),	# Wild Strawberry
+              (222, 93, 131),	# Blush
+              (159, 129, 112),	# Beaver
+              (59, 176, 143),	# Jungle Green
+              (195, 100, 197),	# Fuchsia
+              (247, 83, 148),	# Violet Red
+              (48, 186, 143),	# Mountain Meadow
+              (253, 94, 83),	# Sunset Orange
+              (255, 72, 208),	# Razzle Dazzle Rose
+              (157, 129, 186),	# Purple Mountains' Majesty 
+              (149, 145, 140),	# Gray
+              (255, 110, 74),	# Outrageous Orange
+              (109, 174, 129),	# Forest Green
+              (28, 211, 162),	# Caribbean Green
+              (255, 117, 56),	# Orange
+              (135, 169, 107),	# Asparagus
+              (246, 100, 175),	# Magenta
+              (31, 206, 203),	# Robin's Egg Blue
+              (252, 108, 133),	# Wild Watermelon
+              (234, 126, 93),	# Burnt Sienna
+              (151, 154, 170),	# Manatee
+              (214, 138, 89),	# Raw Sienna
+              (29, 249, 20),	# Electric Lime
+              (113, 188, 120),	# Fern
+              (255, 127, 73),	# Burnt Orange
+              (69, 206, 162),	# Shamrock
+              (255, 130, 67),	# Mango Tango
+              (253, 124, 110),	# Bittersweet
+              (205, 149, 117),	# Antique Brass
+              (221, 148, 117),	# Copper
+              (247, 128, 161),	# Pink Sherbet
+              (252, 116, 253),	# Pink Flamingo
+              (162, 173, 208),	# Wild Blue Yonder
+              (252, 137, 172),	# Tickle Me Pink
+              (186, 184, 108),	# Olive Green
+              (251, 126, 253),	# Shocking Pink
+              (173, 173, 214),	# Blue Bell
+              (255, 163, 67),	# Neon Carrot
+              (239, 152, 170),	# Mauvelous
+              (222, 170, 136),	# Tumbleweed
+              (176, 183, 198),	# Cadet Blue
+              (205, 164, 222),	# Wisteria
+              (250, 167, 108),	# Tan
+              (255, 160, 137),	# Vivid Tangerine
+              (255, 164, 116),	# Atomic Tangerine
+              (255, 155, 170),	# Salmon
+              (120, 219, 226),	# Aquamarine
+              (119, 221, 231),	# Turquoise Blue
+              (230, 168, 215),	# Orchid
+              (128, 218, 235),	# Sky Blue
+              (255, 182, 83),	# Yellow Orange
+              (154, 206, 235),	# Cornflower
+              (205, 197, 194),	# Silver
+              (255, 170, 204),	# Carnation Pink
+              (118, 255, 122),	# Screamin Green
+              (159, 226, 191),	# Sea Green
+              (168, 228, 160),	# Granny Smith Apple
+              (231, 198, 151),	# Gold
+              (178, 236, 93),	# Inchworm
+              (255, 189, 136),	# Macaroni and Cheese
+              (252, 180, 213),	# Lavender
+              (255, 207, 72),	# Sunglow
+              (253, 188, 180),	# Melon
+              (197, 208, 230),	# Periwinkle
+              (197, 227, 132),	# Yellow Green
+              (255, 188, 217),	# Cotton Candy
+              (239, 205, 184),	# Desert Sand
+              (219, 215, 210),	# Timberwolf
+              (255, 217, 117),	# Goldenrod
+              (255, 207, 171),	# Peach
+              (239, 219, 197),	# Almond
+              (253, 217, 181),	# Apricot
+              (240, 232, 145),	# Green Yellow
+              (252, 232, 131),	# Yellow
+              (253, 215, 228),	# Piggy Pink
+              (236, 234, 190),	# Spring Green
+              (250, 231, 181),	# Banana Mania
+              (237, 237, 237),	# White
+              (253, 252, 116),	# Laser Lemon
+              (253, 252, 116),	# Unmellow Yellow
+              (255, 255, 159),	# Canary
+              )
+fullProcessAndBanded(Crayola120, 'Crayola120')
 
 # Create colorbars and linear maps from all of the builtin cmaps
+# It's a lot of them, so don't do the below unless you really want to see _all_ of them.
 # Uncomment the 7 lines below to see all built-in colormaps as colorbars and linear maps
 #import matplotlib as mpl
 #
