@@ -15,6 +15,7 @@ from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap as lsc
 
 from PIL import Image
+from PIL import ImageColor
 
 from datetime import datetime
 
@@ -73,14 +74,36 @@ def palette(cm):
     return(ncColors)
 
 
+def get_lum(pixel):
+    # Calculate luminosity of an (r, g, b) pixel
+    # gray level = 0.3r + 0.59g + 0.11b
+
+    lum = int((0.3 * pixel[0]) + (0.59 * pixel[1]) + (0.11 * pixel[2]))
+
+    return(lum)
+
+
 def colorbar(colors):
-    # Create a colorbar mage from a palette
+    # Create a colorbar image from a palette
     cbIm = Image.new('RGB', (5 * 256, 64))
     cbPixels = cbIm.load()
 
     for y in range(64):
         for x in range(256 * 5):
             cbPixels[x, y] = colors[int(x / 5)]
+
+    cbIm.show()
+
+
+def brightnessColorbar(colors):
+    # Create a colorbar image from a palette based on luminosity
+    cbIm = Image.new('RGB', (5 * 256, 64))
+    cbPixels = cbIm.load()
+
+    for y in range(64):
+        for x in range(256 * 5):
+            lum = get_lum(colors[int(x / 5)])
+            cbPixels[x, y] = (lum, lum, lum)
 
     cbIm.show()
 
@@ -121,7 +144,7 @@ def plot_linearmap(cm):
     plt.show()
 
 
-# Write the provide palette out as JSON data
+# Write the provided palette out as JSON data
 def writeColors(colors, name):
     cpFP = open(name + '.json', 'wt')
     json.dump(colors, cpFP, indent=4)
@@ -129,7 +152,7 @@ def writeColors(colors, name):
     print('Custom palette', name + '.json', 'written to disk.')
 
 
-# Sort a palette based on the gray value brightness of the colors
+# Sort a palette based on the grayscale value brightness of the colors
 def bSort(palette):
     # Use a lambda to do the sorting
     lbPal = sorted(palette, key=lambda x: ((0.59 * x[1]) + (0.3 * x[0]) + (0.11 * x[2])))
@@ -160,33 +183,46 @@ def customBCM(name, palette):
 #     5. Draw colorbar from colormap
 #     6. Plot colormap lines
 def fullProcess(colors, name):
-    
+    print("fullProcess")
     Dict = createCDict(colors)
     cmNew = custCM(Dict, name)
     Colors = palette(cmNew)
     writeColors(Colors, name)
     colorbar(Colors)
+    brightnessColorbar(Colors)
 #    plot_linearmap(cmNew)
     plot_linearmap_offline(cmNew)
 
 
 def cmapProcess(name):
-    cmNew = plt.cm.get_cmap(name)
+    print("cmapProcess")
+    cmNew = plt.colormaps[name]
     colors = palette(cmNew)
+    writeColors(colors, name)
     colorbar(colors)
+    brightnessColorbar(colors)
+    anticolors = [(255 - r, 255 - g, 255 - b) for r, g, b in colors]
+    colorbar(anticolors)
+    colors.reverse()
+    colorbar(colors)
+    anticolors.reverse()
+    colorbar(anticolors)
 #    plot_linearmap(cmNew)
     plot_linearmap_offline(cmNew)
 
 
 def customCmapProcess(name, cmNew):
+    print("customCmapProcess")
     colors = palette(cmNew)
     colorbar(colors)
+    brightnessColorbar(colors)
 #    plot_linearmap(cmNew)
     plot_linearmap_offline(cmNew)
     writeColors(colors, name)
 
 
 def _fPAB(palette, name):
+    print("_fPAB")
     # create both fade and banded transition palettes, display colorbar and linearmap
     cmName = 'cm' + name
     fullProcess(palette, name)
@@ -195,6 +231,7 @@ def _fPAB(palette, name):
     
 
 def fullProcessAndBanded(palette, name, bsort=False):
+    print("fullProcessAndBanded")
     # create both fade and banded transtions, and possible brightness sorted version
     _fPAB(palette, name)
     if bsort:
@@ -278,6 +315,25 @@ IL = ((255, 0, 0),      # red
       (255, 0, 0),      # red
       )
 #fullProcessAndBanded(IL, 'IL', True)
+
+# KRYGCBMWMBCGYRK rainbow
+BWIL = ((0, 0, 0),        # black
+      (255, 0, 0),      # red
+      (255, 255, 0),    # yellow
+      (0, 255, 0),      # green
+      (0, 255, 255),    # cyan
+      (0, 0, 255),      # blue
+      (255, 0, 255),    # magenta
+      (255, 255, 255),  # white
+      (255, 0, 255),    # magenta
+      (0, 0, 255),      # blue
+      (0, 255, 255),    # cyan
+      (0, 255, 0),      # green
+      (255, 255, 0),    # yellow
+      (255, 0, 0),      # red
+      (0, 0, 0),        # black
+      )
+#fullProcessAndBanded(BWIL, 'BWIL', True)
 
 PgChPiRdOrBl = list()
 PgChPiRdOrBl.extend(PgChPi)
@@ -473,9 +529,9 @@ NgHpPu = ((12, 255, 12), (250, 45, 255), (130, 115, 255))
 
 DMaMnRdOrYe = ((0, 0, 0),       # black
                (32, 0, 32),     # magenta
-               (64, 0, 32),    # maroon
-               (96, 0, 0),     # red
-               (128, 64, 0),   # orange
+               (64, 0, 32),     # maroon
+               (96, 0, 0),      # red
+               (128, 64, 0),    # orange
                (160, 160, 0),   # yellow
                (192, 192, 192), # white
                )
@@ -498,6 +554,18 @@ Crayola8 = ((35, 35, 35),       # Black
             (146, 110, 174),    # Violet (Purple)
             )
 #fullProcessAndBanded(Crayola8, 'Crayola8', True)
+
+# Crayola Crayon 8-count Box
+SCrayola8 = ((35, 35, 35),       # Black
+             (238, 32, 77),      # Red
+             (255, 117, 56),     # Orange
+             (252, 232, 131),    # Yellow
+             (28, 172, 120),     # Green
+             (31, 117, 254),     # Blue
+             (146, 110, 174),    # Violet (Purple)
+             (180, 103, 77),     # Brown
+             )
+#fullProcessAndBanded(SCrayola8, 'SCrayola8', True)
 
 # Crayola Crayon 16-count Box
 Crayola16 = ((35, 35, 35),      # Black
@@ -801,7 +869,7 @@ Crayola96 = ((35, 35, 35),	# Black
              (253, 252, 116),	# Laser Lemon
              (253, 252, 116),	# Unmellow Yellow
              )
-fullProcessAndBanded(Crayola96, 'Crayola96')
+#fullProcessAndBanded(Crayola96, 'Crayola96')
 
 Crayola120 = ((35, 35, 35),	# Black
               (26, 72, 118),	# Midnight Blue
@@ -924,7 +992,532 @@ Crayola120 = ((35, 35, 35),	# Black
               (253, 252, 116),	# Unmellow Yellow
               (255, 255, 159),	# Canary
               )
-fullProcessAndBanded(Crayola120, 'Crayola120')
+#fullProcessAndBanded(Crayola120, 'Crayola120')
+
+YeGr = ((255, 255, 0), (0, 255, 0))
+#fullProcessAndBanded(YeGr, 'YeGr')
+
+YeCy = ((255, 255, 0), (0, 255, 255))
+#fullProcessAndBanded(YeCy, 'YeCy')
+
+RGBR = ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 0, 0))
+#fullProcessAndBanded(RGBR, 'RGBR')
+
+SepiaW = ((112, 66, 20), (255, 255, 255))
+#fullProcessAndBanded(SepiaW, 'SepiaW')
+
+Sepia = ((112, 66, 20), (255, 150, 46))
+#fullProcessAndBanded(Sepia, 'Sepia')
+
+VIBGYOR = ((138,  43, 226),
+           ( 75,   0, 130),
+           (  0,   0, 255),
+           (  0, 255,   0),
+           (255, 255,   0),
+           (255, 128,   0),
+           (255,   0,   0),
+          )
+#fullProcessAndBanded(VIBGYOR, 'VIBGYOR', True)
+
+BkVIBGYORW = ((0, 0, 0),
+           (138,  43, 226),
+           ( 75,   0, 130),
+           (  0,   0, 255),
+           (  0, 255,   0),
+           (255, 255,   0),
+           (255, 128,   0),
+           (255,   0,   0),
+           (255, 255, 255),
+          )
+#fullProcessAndBanded(BkVIBGYORW, 'BkVIBGYORW', True)
+
+# Dark Brown to Bright Sepia
+DBS = ((55, 33, 17),
+       (255, 150, 46)
+      )
+#fullProcessAndBanded(DBS, 'DBS', True)
+
+BSW = ((0, 0, 0),
+       (112, 66, 20),
+       (255, 255, 255),
+      )
+#fullProcessAndBanded(BSW, 'BSW', True)
+
+SortedC120 = (
+	(35, 35, 35),
+	(237, 237, 237),
+	(204, 102, 102),
+	(205, 74, 74),
+	(188, 93, 88),
+	(255, 83, 73),
+	(253, 94, 83),
+	(253, 124, 110),
+	(253, 188, 180),
+	(255, 160, 137),
+	(255, 110, 74),
+	(234, 126, 93),
+	(180, 103, 77),
+	(205, 197, 194),
+	(255, 127, 73),
+	(221, 148, 117),
+	(165, 105, 79),
+	(255, 117, 56),
+	(255, 130, 67),
+	(255, 164, 116),
+	(159, 129, 112),
+	(205, 149, 117),
+	(239, 205, 184),
+	(214, 138, 89),
+	(222, 170, 136),
+	(250, 167, 108),
+	(255, 207, 171),
+	(255, 189, 136),
+	(253, 217, 181),
+	(255, 163, 67),
+	(239, 219, 197),
+	(149, 145, 140),
+	(219, 215, 210),
+	(255, 182, 83),
+	(231, 198, 151),
+	(138, 121, 93),
+	(255, 217, 117),
+	(250, 231, 181),
+	(255, 207, 72),
+	(252, 232, 131),
+	(240, 232, 145),
+	(236, 234, 190),
+	(186, 184, 108),
+	(253, 252, 116),
+	(253, 252, 116),
+	(255, 255, 159),
+	(197, 227, 132),
+	(178, 236, 93),
+	(135, 169, 107),
+	(168, 228, 160),
+	(29, 249, 20),
+	(118, 255, 122),
+	(113, 188, 120),
+	(109, 174, 129),
+	(159, 226, 191),
+	(28, 172, 120),
+	(69, 206, 162),
+	(48, 186, 143),
+	(59, 176, 143),
+	(28, 211, 162),
+	(23, 128, 109),
+	(21, 128, 120),
+	(31, 206, 203),
+	(120, 219, 226),
+	(119, 221, 231),
+	(128, 218, 235),
+	(65, 74, 76),
+	(28, 169, 201),
+	(25, 158, 189),
+	(29, 172, 214),
+	(154, 206, 235),
+	(26, 72, 118),
+	(25, 116, 210),
+	(43, 108, 196),
+	(31, 117, 254),
+	(46, 80, 144),
+	(197, 208, 230),
+	(176, 183, 198),
+	(162, 173, 208),
+	(93, 118, 203),
+	(151, 154, 170),
+	(173, 173, 214),
+	(115, 102, 189),
+	(116, 66, 200),
+	(120, 81, 169),
+	(157, 129, 186),
+	(146, 110, 174),
+	(205, 164, 222),
+	(143, 80, 157),
+	(195, 100, 197),
+	(251, 126, 253),
+	(252, 116, 253),
+	(142, 69, 133),
+	(255, 0, 204),
+	(230, 168, 215),
+	(255, 72, 208),
+	(255, 0, 187),
+	(192, 68, 143),
+	(110, 81, 96),
+	(255, 67, 164),
+	(246, 100, 175),
+	(221, 68, 146),
+	(252, 180, 213),
+	(255, 188, 217),
+	(255, 170, 204),
+	(247, 83, 148),
+	(227, 37, 107),
+	(253, 215, 228),
+	(202, 55, 103),
+	(252, 137, 172),
+	(222, 93, 131),
+	(247, 128, 161),
+	(200, 56, 90),
+	(238, 32, 77),
+	(239, 152, 170),
+	(255, 73, 107),
+	(252, 108, 133),
+	(242, 40, 71),
+	(255, 155, 170),
+	(203, 65, 84),
+)
+#fullProcessAndBanded(SortedC120, 'SortedC120', True)
+
+SortedC32 = (
+	(35, 35, 35),
+	(237, 237, 237),
+	(188, 93, 88),
+	(255, 83, 73),
+	(253, 188, 180),
+	(180, 103, 77),
+	(255, 117, 56),
+	(250, 167, 108),
+	(255, 207, 171),
+	(253, 217, 181),
+	(149, 145, 140),
+	(219, 215, 210),
+	(255, 182, 83),
+	(252, 232, 131),
+	(240, 232, 145),
+	(197, 227, 132),
+	(28, 172, 120),
+	(128, 218, 235),
+	(25, 158, 189),
+	(29, 172, 214),
+	(31, 117, 254),
+	(46, 80, 144),
+	(176, 183, 198),
+	(93, 118, 203),
+	(115, 102, 189),
+	(146, 110, 174),
+	(205, 164, 222),
+	(247, 83, 248),
+	(192, 68, 143),
+	(255, 170, 204),
+	(247, 83, 148),
+	(238, 32, 77),
+)
+#fullProcessAndBanded(SortedC32, 'SortedC32', True)
+
+DblCy = (
+    (0, 0, 64),     # Dark Blue
+    (0, 255, 255),  # Cyan
+)
+#fullProcessAndBanded(DblCy, 'DblCy', True)
+
+PPiW = (
+    (175,  14, 248),  # Purple
+    (242, 131, 252),  # Pink
+    (255, 255, 255),  # White
+)
+#fullProcessAndBanded(PPiW, 'PPiW', True)
+
+# Based on the "tab20" cmap.
+T20 = (
+    ( 31, 119, 180),
+    (174, 199, 232),
+    (255, 127,  14),
+    (255, 187, 120),
+    ( 44, 160,  44),
+    (152, 223, 138),
+    (214,  39,  40),
+    (255, 152, 150),
+    (148, 103, 189),
+    (197, 176, 213),
+    (140,  86,  75),
+    (196, 156, 148),
+    (227, 119, 194),
+    (247, 182, 210),
+    (127, 127, 127),
+    (199, 199, 199),
+    (188, 189,  34),
+    (219, 219, 141),
+    ( 23, 190, 207),
+    (158, 218, 229),
+)
+#fullProcessAndBanded(T20, 'T20', True)
+
+T20B = (   
+    ( 57,  59, 121),
+    ( 82,  84, 163),
+    (107, 110, 207),
+    (156, 158, 222),
+    ( 99, 121,  57),
+    (140, 162,  82),
+    (181, 207, 107),
+    (206, 219, 156),
+    (140, 109,  49),
+    (189, 158,  57),
+    (231, 186,  82),
+    (231, 203, 148),
+    (132,  60,  57),
+    (173,  73,  74),
+    (214,  97, 107),
+    (231, 150, 156),
+    (123,  65, 115),
+    (165,  81, 148),
+    (206, 109, 189),
+    (222, 158, 214),
+)
+#fullProcessAndBanded(T20B, 'T20B', True)
+
+T20C = (( 49, 130, 189),
+ (107, 174, 214),
+ (158, 202, 225),
+ (198, 219, 239),
+ (230,  85,  13),
+ (253, 141,  60),
+ (253, 174, 107),
+ (253, 208, 162),
+ ( 49, 163,  84),
+ (199, 233, 192),
+ (117, 107, 177),
+ (158, 154, 200),
+ (188, 189, 220),
+ (218, 218, 235),
+ ( 99,  99,  99),
+ (150, 150, 150),
+ (189, 189, 189),
+ (217, 217, 217),
+)
+#fullProcessAndBanded(T20C, 'T20C', True)
+
+
+YlChOr = ((255, 255, 0),
+          (24, 32, 32),
+          (255, 128, 0)
+)
+#fullProcessAndBanded(YlChOr, 'YlChOr', True)
+
+
+PureC8 = ((  0,   0,   0),      # Pure Black
+          ( 35,  35,  35),      # Black
+          (152,  80,   0),      # Pure Brown
+          (180, 103,  77),      # Brown
+          (255,   0,   0),      # Pure Red
+          (238,  32,  77),      # Red
+          (255, 128,   0),      # Pure Orange
+          (255, 117,  56),      # Orange
+          (255, 255,   0),      # Pure Yellow
+          (252, 232, 131),      # Yellow
+          (  0, 255,   0),      # Pure Green
+          ( 28, 172, 120),      # Green
+          (  0,   0, 255),      # Pure Blue
+          ( 31, 117, 254),      # Blue
+          (210,   0, 255),      # Pure Violet
+          (146, 110, 174),      # Violet (Purple)
+)
+#fullProcessAndBanded(PureC8, "PureC8", True)
+
+# interleaved rainbow and reverse rainbow
+ILRR = ((255, 0, 0),      # red
+        (255, 0, 255),    # magenta
+        (255, 255, 0),    # yellow
+        (0, 0, 255),      # blue
+        (0, 255, 0),      # green
+        (0, 255, 255),    # cyan
+        (0, 255, 255),    # cyan
+        (0, 255, 0),      # green
+        (0, 0, 255),      # blue
+        (255, 255, 0),    # yellow
+        (255, 0, 255),    # magenta
+        (255, 0, 0),      # red
+      )
+#fullProxcessAndBanded(ILRR, 'ILRR', True)
+
+BlOr = ((0, 0, 255), (255, 192, 0))
+#fullProcessAndBanded(BlOr, 'BlOr', True)
+
+GrMa = ((0, 255, 0), (255, 0, 192))
+#fullProcessAndBanded(GrMa, 'GrMa', True)
+
+RdCy = ((255, 0, 0), (0, 192, 255))
+#fullProcessAndBanded(RdCy, 'RdCy', True)
+
+YlCy = ((255, 255, 0), (0, 192, 255))
+#fullProcessAndBanded(YlCy, 'YlCy', True)
+
+Comps = ((0, 0, 255),
+         (255, 0, 0),
+         (0, 255, 0),
+         (0, 192, 255),
+         (255, 0, 192),
+         (255, 192, 0),
+        )
+#fullProcessAndBanded(Comps, 'Comps', True)
+
+# Copper and Teal
+CT = ((0, 128, 128),
+      (185, 115, 50),
+     )
+#fullProcessAndBanded(CT, 'CT', True)
+
+# Bright Copper and Teal
+BCT = ((0, 255, 255),
+      (255, 160, 70),
+     )
+#fullProcessAndBanded(BCT, 'BCT', True)
+
+#Red to Yellow through Orange
+RY = ((255, 0, 0),
+      (255, 128, 0),
+      (255, 255, 0),
+     )
+#fullProcessAndBanded(RY, 'RY', True)
+
+# Bright Rainbow
+BR = ((255, 0, 0),      # Red
+      (255, 128, 0),    # Orange
+      (255, 255, 0),    # Yellow
+      (128, 255, 0),    # Chartreuse
+      (0, 255, 0),      # Green
+      (0, 255, 128),    # Aquamarine
+      (0, 255, 255),    # Cyan
+      (0, 128, 255),    # Cornflower
+      (0, 0, 255),      # Blue
+      (128, 0, 255),    # Purple
+      (255, 0, 255),    # Magenta
+      (255, 0, 128),    # Rose
+      (255, 0, 0),      # Red
+    )
+#fullProcessAndBanded(BR, 'BR', True)
+
+
+# Charcoal/Red/Orange/Yellow
+ChRdOrYl = ((24, 32, 32),
+            (255, 0, 0),
+            (255, 128, 0),
+            (255, 255, 0),
+)
+#fullProcessAndBanded(ChRdOrYl, 'ChRdOrYl', True)
+
+
+# Charcoal-interleaved Bright Rainbow
+ChBR = ((24, 32, 32),   # Charcoal
+        (255, 0, 0),      # Red
+        (24, 32, 32),   # Charcoal
+        (255, 128, 0),    # Orange
+        (24, 32, 32),   # Charcoal
+        (255, 255, 0),    # Yellow
+        (24, 32, 32),   # Charcoal
+        (128, 255, 0),    # Chartreuse
+        (24, 32, 32),   # Charcoal
+        (0, 255, 0),      # Green
+        (24, 32, 32),   # Charcoal
+        (0, 255, 128),    # Aquamarine
+        (24, 32, 32),   # Charcoal
+        (0, 255, 255),    # Cyan
+        (24, 32, 32),   # Charcoal
+        (0, 128, 255),    # Cornflower
+        (24, 32, 32),   # Charcoal
+        (0, 0, 255),      # Blue
+        (24, 32, 32),   # Charcoal
+        (128, 0, 255),    # Purple
+        (24, 32, 32),   # Charcoal
+        (255, 0, 255),    # Magenta
+        (24, 32, 32),   # Charcoal
+        (255, 0, 128),    # Rose
+        (24, 32, 32),   # Charcoal
+        (255, 0, 0),      # Red
+        (24, 32, 32),   # Charcoal
+       )
+#fullProcessAndBanded(ChBR, 'ChBR', True)
+
+
+# Charcoal-interleaved Bright Rainbow
+partialChBR = ((24, 32, 32),   # Charcoal
+        (255, 0, 0),      # Red
+        (255, 128, 0),    # Orange
+        (255, 255, 0),    # Yellow
+        (128, 255, 0),    # Chartreuse
+        (24, 32, 32),   # Charcoal
+        (0, 255, 0),      # Green
+        (0, 255, 128),    # Aquamarine
+        (0, 255, 255),    # Cyan
+        (0, 128, 255),    # Cornflower
+        (24, 32, 32),   # Charcoal
+        (0, 0, 255),      # Blue
+        (128, 0, 255),    # Purple
+        (255, 0, 255),    # Magenta
+        (255, 0, 128),    # Rose
+        (24, 32, 32),   # Charcoal
+        (255, 0, 0),      # Red
+       )
+#fullProcessAndBanded(partialChBR, 'partialChBR', True)
+
+# Cyan -> White
+iced = ((0, 128, 255),
+        (128, 192, 255),
+        (255, 255, 255),
+       )
+#fullProcessAndBanded(iced, 'iced', True)
+
+# dark green -> orange
+pumpkin = ((0, 32, 0),
+           (0, 64, 0),
+           (0, 96, 0),
+           (0, 128, 0),
+           (0, 160, 0),
+           (255, 96, 0),
+           (255, 128, 0),
+           (255, 160, 0),
+           (255, 192, 0),
+          )
+#fullProcessAndBanded(pumpkin, 'pumpkin', False)
+
+BlW = ((0, 0, 255),
+      (255, 255, 255),
+     )
+#fullProcessAndBanded(BlW, "BlW", True)
+
+FallingApart = (ImageColor.getcolor("#E43D96", "RGB"),
+                ImageColor.getcolor("#C22658", "RGB"),
+                ImageColor.getcolor("#AA1E21", "RGB"),
+                ImageColor.getcolor("#471002", "RGB"),
+                ImageColor.getcolor("#A24300", "RGB"),
+                ImageColor.getcolor("#A67200", "RGB"),
+                ImageColor.getcolor("#A59A00", "RGB"),
+               )
+#fullProcessAndBanded(FallingApart, "FallingApart", True)
+
+AVaseOfVengeance = (ImageColor.getcolor("#15417E", "RGB"),
+                    ImageColor.getcolor("#1494C3", "RGB"),
+                    ImageColor.getcolor("#9BBA45", "RGB"),
+                    ImageColor.getcolor("#FADD41", "RGB"),
+                    ImageColor.getcolor("#FE8E2A", "RGB"),
+                    ImageColor.getcolor("#DC483A", "RGB"),
+                    )
+#fullProcessAndBanded(AVaseOfVengeance, "AVaseOfVengeance", True)
+
+Pretend = (ImageColor.getcolor("#F087AA", "RGB"),
+           ImageColor.getcolor("#D769AF", "RGB"),
+           ImageColor.getcolor("#A51EA5", "RGB"),
+           ImageColor.getcolor("#7319AF", "RGB"),
+           ImageColor.getcolor("#412396", "RGB"),
+           ImageColor.getcolor("#2D1464", "RGB"),
+          )
+#fullProcessAndBanded(Pretend, "Pretend", True)
+
+FireweedDragon = (ImageColor.getcolor("#2B0A03", "RGB"),
+                  ImageColor.getcolor("#630C14", "RGB"),
+                  ImageColor.getcolor("#9B0F4C", "RGB"),
+                  ImageColor.getcolor("#C42391", "RGB"),
+                  ImageColor.getcolor("#EB76D8", "RGB"),
+                 )
+fullProcessAndBanded(FireweedDragon, "FireweedDragon", True)
+
+
+
+#cmapProcess("gnuplot")
+#cmapProcess("gist_rainbow")
+#cmapProcess("tab20")
+#cmapProcess("tab20b")
+#cmapProcess("tab20c")
+#cmapProcess("autumn")
 
 # Create colorbars and linear maps from all of the builtin cmaps
 # It's a lot of them, so don't do the below unless you really want to see _all_ of them.
