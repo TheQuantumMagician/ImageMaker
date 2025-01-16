@@ -394,7 +394,7 @@ if __name__ == '__main__':
     print("Start now:",  str(datetime.now()))
 
     # Instantiate the command line parser
-    parser = argparse.ArgumentParser(description="cli_sobel: sobel edge-enhancement")
+    parser = argparse.ArgumentParser(description="ImageMaker.py: Image Manipulation Tool")
 
     # Add in all the command line arguments the program recognizes
     # Optional argument for filename (defaults to 'test.png')
@@ -503,6 +503,9 @@ if __name__ == '__main__':
     # Optional argument to create image using tiered edges
     parser.add_argument('--pt', action='store_true', help="create version using palettized tiered edges color")
 
+    # Optional argument to create image using cross stich-ification
+    parser.add_argument('--xs', action='store_true', help="create version using pseudo-cross stitch")
+
     # Get the actual values of the command line arguments.
     args = parser.parse_args()
     print("fn\t", args.fn)
@@ -530,6 +533,7 @@ if __name__ == '__main__':
     print("dc\t", args.dc)
     print("t\t", args.t)
     print("pt\t", args.pt)
+    print("xs\t", args.xs)
 
     # Create the working palette
     colors = []
@@ -1102,14 +1106,238 @@ if __name__ == '__main__':
 #            maxR = int((color[0] / maxComponent) * 255)
 #            maxG = int((color[1] / maxComponent) * 255)
 #            maxB = int((color[2] / maxComponent) * 255)
-            saturator = 255.0 * maxComponent
+#            saturator = 255.0 * maxComponent
+            saturator = 255.0 / maxComponent
             maxR = int(color[0] * saturator)
             maxG = int(color[1] * saturator)
             maxB = int(color[2] * saturator)
             satColors.append((maxR, maxG, maxB))
 
         return(satColors)
-    
+
+    def superSatColor(color):
+        # force saturation to maximum while maintaining hue and value
+        r, g, b = color
+        # convert to (h,s,v) -- NOTE: convert range to 0.0-1.0
+        h, s, v = rgb_to_hsv((r / 255), (g / 255), (b / 255))
+        # keep original hue and value, bump saturation to max, get new (r,g,b)
+        nr, ng, nb = hsv_to_rgb(h, 1.0, v)
+        return(int(nr * 255), int(ng * 255), int(nb * 255))
+
+    def mainComponent(color):
+        # return masked version of largest component of color
+        # NOTE: on =, g>r, b>r, b>g, ie: yellow->green, magenta->blue, white,cyan->blue
+        r, g, b = color
+        if r > g:
+            if r > b:
+                return(((r & 0xF0), 0, 0))
+            else:
+                return((0, 0, (b * 0xF0)))
+        else:
+            if g > b:
+                return((0, (g & 0xF0), 0))
+            else:
+                return((0, 0, (b & 0xF0)))
+
+    MULTIPLE = 16
+    ROUND = MULTIPLE - 1 
+    # round color channels to the nearest multiple of 16
+    def posterizeColor(color):
+        r, g, b = color
+        nr = (((r + ROUND) // MULTIPLE) * MULTIPLE)
+        ng = (((g + ROUND) // MULTIPLE) * MULTIPLE)
+        nb = (((b + ROUND) // MULTIPLE) * MULTIPLE)
+        return((nr, ng, nb))
+                
+    if args.xs:
+        # Create pseudo-cross stitch image
+
+        # Get saturated version of current palette, for use with stitch
+        xsSatColors = saturatePalette(colors)
+
+        # Ensure output image is an integer multiple of 5 in each dimension
+        xs_x = int(((oIm.size[0] + 4) // 5) * 5)
+        xs_y = int(((oIm.size[1] + 4) // 5) * 5)
+        xs_size = (xs_x, xs_y)
+
+        # create blank canvas for cross stitch image
+        print(str(datetime.now()), "Creating xsIm")
+        xsIm = Image.new("RGB", xs_size, BACKGROUND)
+        xsPixels = xsIm.load()
+        # create properly sized version of original image to allow skipping boundary checking
+        print("\tCreating im")
+        im = Image.new("RGB", xs_size, BACKGROUND)
+        im.paste(oIm, (0, 0))
+        imPixels = im.load()
+        # scan through sized original image, average 3x3 block in center of each 5x5 block,
+        # look up cross stich color, apply cross stitch and complementary background
+        x = 0
+        while x < xsIm.size[0]:
+            y = 0
+            while y < xsIm.size[1]:
+                # get stitch color from average brightness of current 3x3 pixel center block
+                # get total red value of block
+                rTotal = (imPixels[x+1,y+1][0] + imPixels[x+2,y+1][0] + imPixels[x+3,y+1][0] +
+                          imPixels[x+1,y+2][0] + imPixels[x+2,y+2][0] + imPixels[x+3,y+2][0] +
+                          imPixels[x+1,y+3][0] + imPixels[x+2,y+3][0] + imPixels[x+3,y+3][0])
+                # get total green value of block
+                gTotal = (imPixels[x+1,y+1][1] + imPixels[x+2,y+1][1] + imPixels[x+3,y+1][1] +
+                          imPixels[x+1,y+2][1] + imPixels[x+2,y+2][1] + imPixels[x+3,y+2][1] +
+                          imPixels[x+1,y+3][1] + imPixels[x+2,y+3][1] + imPixels[x+3,y+3][1])
+                # get total blue value of block
+                bTotal = (imPixels[x+1,y+1][2] + imPixels[x+2,y+1][2] + imPixels[x+3,y+1][2] +
+                          imPixels[x+1,y+2][2] + imPixels[x+2,y+2][1] + imPixels[x+3,y+2][2] +
+                          imPixels[x+1,y+3][2] + imPixels[x+2,y+3][1] + imPixels[x+3,y+3][2])
+                # calculate average red, green, blue values
+                newR = rTotal // 9
+                newG = gTotal // 9
+                newB = bTotal // 9
+                # calculate brighteness of averaged pixel, look up stitch color in the standard palette
+                lum = get_lum((newR, newG, newB))
+                color = colors[lum]
+                # xs_color = largest component of (r, g, b) set to 255, rest set to 0
+                xs_color = mainComponent(color)
+                # draw in the X of the sticth on the background
+                xsPixels[x,y] = xsPixels[x+4,y] = xsPixels[x,y+4] = xsPixels[x+4,y+4] = color
+                # Draw in center stitch with saturated color
+                xsPixels[x+1,y+1] = xsPixels[x+3,y+1] = xs_color
+                xsPixels[x+2,y+2] = xs_color
+                xsPixels[x+1,y+3] = xsPixels[x+3,y+3] = xs_color
+                # Fill in rest of block with posterized color
+                xsPixels[x+1,y] = xsPixels[x+2,y] = xsPixels[x+3, y] = color
+                xsPixels[x,y+1] = xsPixels[x+2,y+1] = xsPixels[x+4,y+1] = color
+                xsPixels[x,y+2] = xsPixels[x+1,y+2] = xsPixels[x+3,y+2] = xsPixels[x+4,y+2] = color
+                xsPixels[x,y+3] = xsPixels[x+2,y+3] = xsPixels[x+4,y+3] = color
+                xsPixels[x+1,y+4] = xsPixels[x+2,y+4] = xsPixels[x+3,y+4] = color
+                y += 5
+            x += 5
+
+        if args.da:
+            xsIm.show()
+
+        if args.sa:
+            xsIm.save(savePalBase + "xs.png", format="PNG", quality=95)
+            print(str(datetime.now()), "Cross Stich image saved.")
+
+        print(str(datetime.now()), "Starting Big Cross Stitch image.")
+        # Ensure output image is an integer multiple of blocksize in each dimension, in this case 11
+        # NOTE NOTE NOTE: if you change bsSize you MUST update this to match!!!
+        # Current assumption here is that bsSize == 11
+        bsxPattern = ((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                      (0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0),
+                      (0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0),
+                      (0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
+                      (0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0),
+                      (0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0),
+                      (0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0),
+                      (0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
+                      (0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0),
+                      (0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0),
+                      (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                     )
+        bsSize = 11
+        bxs_x = int(((oIm.size[0] + (bsSize - 1)) // bsSize) * bsSize)
+        bxs_y = int(((oIm.size[1] + (bsSize - 1)) // bsSize) * bsSize)
+        bxs_size = (bxs_x, bxs_y)
+
+        # create blank canvas for cross stitch image
+        print("\tCreating xsIm")
+        bxsIm = Image.new("RGB", bxs_size, BACKGROUND)
+        bxsPixels = bxsIm.load()
+        # create properly sized version of original image to allow skipping boundary checking
+        print("\tCreating im")
+        bIm = Image.new("RGB", bxs_size, BACKGROUND)
+        bIm.paste(oIm, (0, 0))
+        bImPixels = bIm.load()
+        print("oIm.size", oIm.size)
+        print("bIm.size", bIm.size)
+        x = 0
+        histo = dict()
+        while x < oIm.size[0]:
+            y = 0
+            while y < oIm.size[1]:
+                # Calculate average color of the bsSize block
+                rtotal = 0
+                gtotal = 0
+                btotal = 0
+                for xos in range(x, x + bsSize):
+                    for yos in range(y, y + bsSize):
+                        try:
+                            pixel = bImPixels[xos,yos]
+                            rtotal += pixel[0]
+                            gtotal += pixel[1]
+                            btotal += pixel[2]
+                        except IndexError:
+                            print("IndexError:", (xos, yos))
+                ar = int(rtotal // (bsSize * bsSize))
+                ag = int(gtotal // (bsSize * bsSize))
+                ab = int(btotal // (bsSize * bsSize))
+                # get stitch color from posterized verstion of average color
+                bxsColor = posterizeColor((ar, ag, ab))
+                if bxsColor in histo:
+                    histo[bxsColor] += 1
+                else:
+                    histo[bxsColor] = 1
+                # Now, draw in the big cross stitch. use matrix pattern for drawing it in
+                for xndx in range(bsSize):
+                    for yndx in range(bsSize):
+                        if bsxPattern[xndx][yndx] == 1:
+                            bxsPixels[x + xndx, y + yndx] = bxsColor                            
+                y += bsSize
+            x += bsSize
+        print()
+        print("There are", len(histo), "unique colors in the posterized colors.")
+        items = sorted(list(histo.items()), key=lambda x: x[1], reverse=True)
+        for i in range(10):
+            print(i, ":", items[i][0], "-->", items[i][1])
+        print()
+        
+
+        if args.da:
+            bsxIm.show()
+
+        if args.sa:
+            bxsIm.save(saveBase + "xsbms.png", format="PNG", quality=95)
+            print(str(datetime.now()), "Big Cross Stich image saved.")
+
+        print(str(datetime.now()), "Starting Main Component Big Cross Stitch.")
+        for x in range(bxsIm.size[0]):
+            for y in range(bxsIm.size[1]):
+                pixel = bxsPixels[x, y]
+                if not (pixel[0] == 0 and pixel[1] == 0 and pixel[2] == 0):
+                    bxsPixels[x, y] = mainComponent(pixel)
+
+        if args.da:
+            bsxIm.show()
+
+        if args.sa:
+            bxsIm.save(saveBase + "xsbmcms.png", format="PNG", quality=95)
+            print(str(datetime.now()), "Main Component Big Cross Stich image saved.")
+
+        # Now create an overlaid cross stitch version from the original photo
+        # with either Red, Green, or Blue stitch color as the overlay
+        x = 0
+        while x < im.size[0]:
+            y = 0
+            while y < im.size[1]:
+                # set stitch color to either red, green, or blue
+                color = imPixels[x+2,y+2]
+                xs_color = mainComponent(color)
+                # Draw in center stitch with saturated color
+                imPixels[x+1,y+1] = imPixels[x+3,y+1] = xs_color
+                imPixels[x+2,y+2] = xs_color
+                imPixels[x+1,y+3] = imPixels[x+3,y+3] = xs_color
+                y += 5
+            x += 5
+
+        if args.da:
+            im.show()
+
+        if args.sa:
+            im.save(saveBase + "xsms.png", format="PNG", quality=95)
+            print(str(datetime.now()), "Max Saturation Cross Stich image saved.")
+
+
     satColors = saturatePalette(colors)
     satPIm = getImage(lums,
                    savePalBase + "spp.png",
@@ -1118,7 +1346,7 @@ if __name__ == '__main__':
                    (args.sa or args.sp),
                    BORDER
                    )
-    print(str(datetime.now()), "Saturated Palette Postermv ized image done.")
+    print(str(datetime.now()), "Saturated Palette Posterized image done.")
 
     satEIm = applyEdges(satPIm,
                             normEdges,
@@ -1153,3 +1381,4 @@ if __name__ == '__main__':
         print(str(datetime.now()), "Edged Saturated Palette Posterized invert image done.")
 
     print(str(datetime.now()), "Run complete.")
+    
